@@ -2,7 +2,7 @@
 
 为 GNOME Shell 51 创建的轻量桌面组件扩展。中文界面，独立实现，GPL-3.0-only。
 
-**当前版本：0.1.0-alpha.1。** 主屏首版，不是全功能稳定版；测试范围见 [验证记录](docs/VALIDATION.md)。
+**当前版本：0.1.0-alpha.2。** 主屏首版；测试范围见 [验证记录](docs/VALIDATION.md)。
 
 ![Perch 深色桌面](docs/screenshots/desktop-dark.png)
 
@@ -15,6 +15,8 @@
 - 编辑模式将组件临时移到窗口上方，支持标题拖拽、右下角缩放、网格吸附和碰撞约束。
 - 编辑时聚焦组件标题，方向键移动，Shift + 方向键缩放；Esc 结束编辑。
 - 明暗主题、跟随系统、半透明背景、秒数开关、监控刷新间隔。
+- 参考 macOS 桌面组件的柔和圆角、轻量标题、暖黄色便签与双环系统指标。
+- 卡片、菜单和设置明确使用简体中文区域字体，避免日韩字形回退。
 - 屏幕尺寸变化后重新排布，放不下的组件暂时隐藏，保留原位置。
 - 本地原子保存；未知数据版本或损坏文件进入保护状态，不覆盖原文件。
 
@@ -24,6 +26,7 @@
 
 需要 GNOME Shell 51、GJS、GNOME Extensions 工具。设置窗口需要 GTK4/libadwaita。
 系统监控使用 Linux `/proc`，无需额外服务；便签无需联网。
+推荐安装 `Noto Sans CJK SC`（Arch/CachyOS 包名 `noto-fonts-cjk`）。字体选择也支持思源黑体 SC/CN 和文泉驿微米黑；仅使用系统通用字体可能出现区域字形差异。
 
 在仓库目录执行：
 
@@ -88,6 +91,7 @@ lib/store.js       本地状态加载、保存队列和错误保护
 lib/io.js          异步文件操作
 lib/system.js      系统数据采样生命周期
 lib/metrics.js     CPU 和内存数据计算
+lib/typography.js  简体中文字体选择与文本语言属性
 widgets/index.js   首版三个组件
 schemas/           GSettings 定义
 tests/             单元、GJS 文件持久化和真实 Shell 测试
@@ -102,4 +106,5 @@ docs/              计划、验证记录
 
 参考 [Gridgets](https://github.com/rebatnaath/gridgets) 的桌面网格交互，未复制其组件源码或视觉资源。
 API 以本机 GNOME Shell 51 和 [官方迁移指南](https://gjs.guide/extensions/upgrading/gnome-shell-51.html) 为依据。
+视觉参考 [Apple 的桌面组件说明](https://support.apple.com/en-gb/guide/mac-help/mchl52be5da5/mac)，使用独立配色、图标与实现。
 桌面层级依赖一处 Shell 私有背景组引用，升级到后续 Shell 大版本时需要重新验证。

@@ -3,7 +3,7 @@
   "name": "栖格 Perch",
   "description": "GNOME 51 桌面组件：日期时钟、便签和系统监控。支持网格编辑和本地布局保存。",
   "shell-version": ["51"],
-  "version": 1,
-  "version-name": "0.1.0-alpha.1",
+  "version": 2,
+  "version-name": "0.1.0-alpha.2",
   "settings-schema": "org.gnome.shell.extensions.perch"
 }

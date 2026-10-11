@@ -9,6 +9,7 @@ import {Desktop} from './lib/desktop.js';
 import {Store} from './lib/store.js';
 import {TYPES} from './lib/layout.js';
 import {TITLES} from './widgets/index.js';
+import {chineseFontStyle, applyChineseLanguage} from './lib/typography.js';
 
 export default class Perch extends Extension {
     enable() {
@@ -37,6 +38,8 @@ export default class Perch extends Extension {
         this._indicator.menu.addAction('外观与设置', () => this.openPreferences());
         this._status = new PopupMenu.PopupMenuItem('正在载入…', {reactive: false});
         this._indicator.menu.addMenuItem(this._status);
+        this._indicator.menu.box.set_style(chineseFontStyle());
+        applyChineseLanguage(this._indicator.menu.box);
         this._settingsSignal = this._settings.connect('changed', () => {
             for (const [type, item] of this._toggles)
                 item.setToggleState(this._settings.get_boolean(`show-${type}`));

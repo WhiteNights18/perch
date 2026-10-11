@@ -3,14 +3,24 @@ import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import {chineseFontStyle} from './lib/typography.js';
 
 export default class PerchPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
+        window.add_css_class('perch-preferences');
+        const provider = new Gtk.CssProvider();
+        provider.load_from_string(`.perch-preferences { ${chineseFontStyle()} }`);
+        const display = window.get_display();
+        Gtk.StyleContext.add_provider_for_display(display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+        window.connect('close-request', () => {
+            Gtk.StyleContext.remove_provider_for_display(display, provider);
+            return false;
+        });
         window.set_default_size(620, 700);
         const page = new Adw.PreferencesPage({title: '栖格', icon_name: 'view-grid-symbolic'});
         window.add(page);
-        const appearance = new Adw.PreferencesGroup({title: '让桌面留一点呼吸', description: '栖格 Perch · 主显示器上的轻量桌面组件'});
+        const appearance = new Adw.PreferencesGroup({title: '你的桌面，一目了然', description: '栖格 Perch · 轻盈、清晰的桌面组件'});
         page.add(appearance);
         const themes = ['system', 'light', 'dark'];
         const theme = new Adw.ComboRow({title: '卡片主题', model: Gtk.StringList.new(['跟随系统', '浅色', '深色']), selected: Math.max(0, themes.indexOf(settings.get_string('theme')))});
@@ -21,7 +31,7 @@ export default class PerchPreferences extends ExtensionPreferences {
             settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
             group.add(row);
         };
-        addSwitch(appearance, 'translucent', '半透明背景', '透出壁纸颜色，不使用模糊效果');
+        addSwitch(appearance, 'translucent', '通透卡片', '让壁纸颜色轻轻透入卡片');
         const widgets = new Adw.PreferencesGroup({title: '桌面组件', description: '关闭组件会保留便签内容和布局。'});
         page.add(widgets);
         addSwitch(widgets, 'show-clock', '时钟与日期');

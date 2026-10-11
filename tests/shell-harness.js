@@ -13,6 +13,22 @@ const delay = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAUL
 const assert = (value, message) => { if (!value) throw new Error(message); };
 const output = GLib.getenv('PERCH_TEST_OUTPUT');
 
+function checkFonts(texts) {
+    const fonts = [];
+    for (const text of texts) {
+        const iter = text.get_layout().get_iter();
+        do {
+            const run = iter.get_run();
+            if (run) {
+                const family = run.item.analysis.font.describe().get_family();
+                fonts.push(family);
+                assert(family === 'Noto Sans CJK SC', `wrong regional font: ${family}`);
+            }
+        } while (iter.next_run());
+    }
+    return fonts;
+}
+
 async function screenshot(name) {
     const stream = Gio.File.new_for_path(`${output}/${name}.png`).replace(null, false, Gio.FileCreateFlags.NONE, null);
     const shooter = new Shell.Screenshot();
@@ -51,10 +67,13 @@ export default class TestPerch extends Perch {
         const entry = note.get_first_child().get_child().get_first_child();
         entry.set_text('今天，留一点时间给自己。\n\n□ 整理课程笔记\n□ 完成一个小目标\n□ 出门散步');
         await delay(3500);
+        const fonts = checkFonts([entry.clutter_text, this._desktop.cards.get('clock')._header.get_child_at_index(1).clutter_text]);
         await screenshot('desktop-dark');
         this._indicator.menu.open();
         await delay(300);
         assert(this._indicator.menu.isOpen, 'panel menu did not open');
+        fonts.push(...checkFonts([this._status.label.clutter_text]));
+        GLib.file_set_contents(`${output}/fonts.txt`, fonts.join('\n'));
         await screenshot('panel-menu');
         this._indicator.menu.close();
         this._desktop.setEditing(true);
@@ -66,12 +85,16 @@ export default class TestPerch extends Perch {
         const seat = global.stage.context.get_backend().get_default_seat();
         const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
         const [x, y] = card._header.get_transformed_position();
-        pointer.notify_absolute_motion(GLib.get_monotonic_time(), x + 60, y + 10);
-        await delay(100);
-        // A new headless pointer starts on the hot-corner barrier; the first
-        // motion can be constrained on one axis. Move again before pressing.
-        pointer.notify_absolute_motion(GLib.get_monotonic_time(), x + 60, y + 10);
-        await delay(150);
+        // A new headless pointer can be constrained by the hot-corner barrier.
+        // Confirm its actual position before sending the button press.
+        for (let i = 0; i < 5; i++) {
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), x + 60, y + 10);
+            await delay(150);
+            const [px, py] = global.get_pointer();
+            if (Math.abs(px - x - 60) < 1 && Math.abs(py - y - 10) < 1)
+                break;
+        }
+        console.log(`[Perch test] drag header reactive=${card._header.reactive}, pointer=${global.get_pointer()}`);
         pointer.notify_button(GLib.get_monotonic_time(), 1, Clutter.ButtonState.PRESSED);
         await delay(100);
         for (let step = 1; step <= 4; step++) {
