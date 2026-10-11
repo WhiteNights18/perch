@@ -1,0 +1,26 @@
+.perch-desktop { font-family: sans-serif; }
+.perch-card { border-radius: 22px; padding: 18px; spacing: 12px; border: 1px solid rgba(255,255,255,0.15); }
+.perch-dark .perch-card { background-color: #252a32; color: #f4f5f7; box-shadow: 0 5px 16px 0 rgba(0,0,0,0.20); }
+.perch-light .perch-card { background-color: #faf9f6; color: #252d38; box-shadow: 0 5px 16px 0 rgba(0,0,0,0.10); border-color: rgba(255,255,255,0.7); }
+.perch-dark.perch-translucent .perch-card { background-color: rgba(32,38,47,0.91); }
+.perch-light.perch-translucent .perch-card { background-color: rgba(250,249,246,0.91); }
+.perch-header { spacing: 9px; border-radius: 7px; }
+.perch-header:focus { box-shadow: inset 0 0 0 2px #78aeed; }
+.perch-title { font-size: 11pt; font-weight: 600; }
+.perch-muted { color: #8c98a8; font-size: 10pt; }
+.perch-light .perch-muted { color: #5e6d7f; }
+.perch-caption { font-size: 9pt; color: #8c98a8; }
+.perch-light .perch-caption { color: #667487; }
+.perch-content { spacing: 5px; }
+.perch-clock { padding-top: 3px; }
+.perch-time { font-size: 36pt; font-weight: 300; font-feature-settings: "tnum"; }
+.perch-value { font-size: 25pt; font-weight: 600; color: #9fcbff; }
+.perch-light .perch-value { color: #2467a6; }
+.perch-note-entry { padding: 0; border: none; border-radius: 0; box-shadow: none; background-color: transparent; color: inherit; font-size: 12pt; }
+.perch-note-entry:focus { border: none; box-shadow: none; background-color: transparent; }
+.perch-edit-mode { background-color: rgba(18,25,36,0.2); border-radius: 12px; }
+.perch-card.perch-editing { border: 1px dashed #78aeed; }
+.perch-card.perch-dragging { border: 1px solid #afd4ff; box-shadow: 0 5px 22px 0 rgba(0,0,0,0.28); }
+.perch-grip, .perch-resize { color: #78aeed; }
+.perch-resize { border-radius: 6px; min-width: 24px; min-height: 20px; }
+.perch-resize:focus { background-color: rgba(120,174,237,0.3); }

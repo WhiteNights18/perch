@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.perch" path="/org/gnome/shell/extensions/perch/">
+    <key name="theme" type="s"><default>'system'</default><choices><choice value="system"/><choice value="light"/><choice value="dark"/></choices><summary>卡片主题</summary></key>
+    <key name="translucent" type="b"><default>true</default><summary>半透明卡片</summary></key>
+    <key name="show-seconds" type="b"><default>false</default><summary>时钟显示秒数</summary></key>
+    <key name="sample-seconds" type="i"><default>3</default><range min="2" max="30"/><summary>系统监控刷新间隔</summary></key>
+    <key name="show-clock" type="b"><default>true</default><summary>显示时钟</summary></key>
+    <key name="show-note" type="b"><default>true</default><summary>显示便签</summary></key>
+    <key name="show-system" type="b"><default>true</default><summary>显示系统监控</summary></key>
+    <key name="reset-layout" type="u"><default>0</default><summary>重置布局请求序号，不删除便签</summary></key>
+  </schema>
+</schemalist>
