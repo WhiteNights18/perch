@@ -1,0 +1,148 @@
+// Runs ONLY in the isolated test copy; never included in release packages.
+import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import Shell from 'gi://Shell';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import Perch from './perch.js';
+
+const delay = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+    resolve();
+    return GLib.SOURCE_REMOVE;
+}));
+const assert = (value, message) => { if (!value) throw new Error(message); };
+const output = GLib.getenv('PERCH_TEST_OUTPUT');
+
+async function screenshot(name) {
+    const stream = Gio.File.new_for_path(`${output}/${name}.png`).replace(null, false, Gio.FileCreateFlags.NONE, null);
+    const shooter = new Shell.Screenshot();
+    await new Promise((resolve, reject) => shooter.screenshot(false, stream, (self, result) => {
+        try { self.screenshot_finish(result); resolve(); } catch (error) { reject(error); }
+    }));
+    stream.close(null);
+}
+
+export default class TestPerch extends Perch {
+    enable() {
+        super.enable();
+        if (!this._started) {
+            this._started = true;
+            this._run().then(() => this._result('PASS')).catch(error => this._result(`FAIL: ${error.message}\n${error.stack}`));
+        }
+    }
+
+    _result(text) {
+        console.log(`[Perch test] ${text}`);
+        GLib.file_set_contents(`${output}/result.txt`, text);
+    }
+
+    async _run() {
+        await delay(5500);
+        Main.overview.hide();
+        Main.welcomeDialog?.close();
+        await delay(1000);
+        assert(this._desktop, 'desktop did not load');
+        assert(this._desktop.cards.size === 3, `expected 3 cards, got ${this._desktop.cards.size}`);
+        assert(this._desktop.actor.visible, 'desktop hidden outside overview');
+        assert(this._desktop.actor.get_parent() === global.window_group, 'wrong desktop layer');
+        this._settings.set_string('theme', 'dark');
+        await delay(350);
+        const note = this._desktop.cards.get('note')._widget.actor;
+        const entry = note.get_first_child().get_child().get_first_child();
+        entry.set_text('今天，留一点时间给自己。\n\n□ 整理课程笔记\n□ 完成一个小目标\n□ 出门散步');
+        await delay(3500);
+        await screenshot('desktop-dark');
+        this._indicator.menu.open();
+        await delay(300);
+        assert(this._indicator.menu.isOpen, 'panel menu did not open');
+        await screenshot('panel-menu');
+        this._indicator.menu.close();
+        this._desktop.setEditing(true);
+        await delay(300);
+        assert(this._desktop.actor.get_parent() === Main.layoutManager.uiGroup, 'edit mode not raised');
+        await screenshot('edit-mode');
+        const card = this._desktop.cards.get('clock');
+        const initial = {...card.rect};
+        const seat = global.stage.context.get_backend().get_default_seat();
+        const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const [x, y] = card._header.get_transformed_position();
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), x + 60, y + 10);
+        await delay(100);
+        // A new headless pointer starts on the hot-corner barrier; the first
+        // motion can be constrained on one axis. Move again before pressing.
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), x + 60, y + 10);
+        await delay(150);
+        pointer.notify_button(GLib.get_monotonic_time(), 1, Clutter.ButtonState.PRESSED);
+        await delay(100);
+        for (let step = 1; step <= 4; step++) {
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), x + 60 + step * 8, y + 10);
+            await delay(80);
+        }
+        pointer.notify_button(GLib.get_monotonic_time(), 1, Clutter.ButtonState.RELEASED);
+        await delay(200);
+        assert(card.rect.x === initial.x + 1, `pointer drag failed: ${JSON.stringify(card.rect)}`);
+        const keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        card._header.grab_key_focus();
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Left, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Left, Clutter.KeyState.RELEASED);
+        await delay(200);
+        assert(card.rect.x === initial.x, 'keyboard move failed');
+        const [rx, ry] = card._resize.get_transformed_position();
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), rx + 8, ry + 8);
+        await delay(100);
+        pointer.notify_button(GLib.get_monotonic_time(), 1, Clutter.ButtonState.PRESSED);
+        await delay(100);
+        for (let step = 1; step <= 4; step++) {
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), rx + 8 + step * 8, ry + 8);
+            await delay(80);
+        }
+        pointer.notify_button(GLib.get_monotonic_time(), 1, Clutter.ButtonState.RELEASED);
+        await delay(200);
+        assert(card.rect.w === initial.w + 1, `pointer resize failed: ${JSON.stringify(card.rect)}`);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Escape, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Escape, Clutter.KeyState.RELEASED);
+        await delay(200);
+        assert(!this._desktop.editing, 'Escape did not finish editing');
+        this._desktop.setEditing(false);
+        entry.grab_key_focus();
+        entry.clutter_text.set_cursor_position(-1);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_x, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_x, Clutter.KeyState.RELEASED);
+        await delay(200);
+        assert(this._store.state.note.endsWith('x'), 'keyboard typing in note failed');
+        entry.set_text(entry.get_text().slice(0, -1));
+        assert(this._store.state.note.includes('课程笔记'), 'note change was not captured');
+        this._settings.set_boolean('show-note', false);
+        await delay(250);
+        assert(this._desktop.cards.size === 2, 'hide widget failed');
+        this._settings.set_boolean('show-note', true);
+        this._settings.set_string('theme', 'light');
+        await delay(3500);
+        await screenshot('desktop-light');
+        for (let i = 0; i < 3; i++) {
+            super.disable();
+            assert(this._desktop === null && this._indicator === null, 'disable left live objects');
+            assert(!global.window_group.get_children().some(a => a.get_style_class_name?.()?.includes('perch-desktop')), 'desktop actor leaked');
+            super.enable();
+            await delay(500);
+            assert(this._desktop.cards.size === 3, 'reenable failed');
+            assert(this._store.state.note.includes('课程笔记'), 'note did not survive reload');
+            assert(this._store.state.layout.clock.w === initial.w + 1, 'resized layout did not survive reload');
+        }
+        // Reset requested while disabled must be applied on the next enable.
+        const settings = this._settings;
+        super.disable();
+        settings.set_uint('reset-layout', settings.get_uint('reset-layout') + 1);
+        super.enable();
+        await delay(500);
+        assert(this._store.state.layout.clock.w === initial.w, 'pending reset was not applied');
+        assert(this._store.state.note.includes('课程笔记'), 'reset erased note');
+        await this._store.flush();
+        await delay(3500);
+        await screenshot('after-reenable');
+        this.openPreferences();
+        await delay(2000);
+        assert(global.get_window_actors().some(actor => /Perch|栖格/.test(actor.meta_window.get_title() ?? '')), 'preferences window did not open');
+        await screenshot('preferences');
+    }
+}
