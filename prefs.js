@@ -35,7 +35,7 @@ export default class PerchPreferences extends ExtensionPreferences {
         const widgets = new Adw.PreferencesGroup({title: '桌面组件', description: '关闭组件会保留便签内容和布局。'});
         page.add(widgets);
         addSwitch(widgets, 'show-clock', '时钟与日期');
-        addSwitch(widgets, 'show-seconds', '显示秒数');
+        addSwitch(widgets, 'show-seconds', '显示秒针');
         addSwitch(widgets, 'show-note', '随手记');
         addSwitch(widgets, 'show-system', '系统状态');
         const interval = new Adw.SpinRow({title: '系统监控刷新间隔', subtitle: '单位：秒', adjustment: new Gtk.Adjustment({lower: 2, upper: 30, step_increment: 1, page_increment: 5})});

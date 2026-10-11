@@ -63,11 +63,10 @@ export default class TestPerch extends Perch {
         assert(this._desktop.actor.get_parent() === global.window_group, 'wrong desktop layer');
         this._settings.set_string('theme', 'dark');
         await delay(350);
-        const note = this._desktop.cards.get('note')._widget.actor;
-        const entry = note.get_first_child().get_child().get_first_child();
+        const entry = this._desktop.cards.get('note')._widget.entry;
         entry.set_text('今天，留一点时间给自己。\n\n□ 整理课程笔记\n□ 完成一个小目标\n□ 出门散步');
         await delay(3500);
-        const fonts = checkFonts([entry.clutter_text, this._desktop.cards.get('clock')._header.get_child_at_index(1).clutter_text]);
+        const fonts = checkFonts([entry.clutter_text, this._desktop.cards.get('clock')._widget.date.clutter_text]);
         await screenshot('desktop-dark');
         this._indicator.menu.open();
         await delay(300);
@@ -80,6 +79,9 @@ export default class TestPerch extends Perch {
         await delay(300);
         assert(this._desktop.actor.get_parent() === Main.layoutManager.uiGroup, 'edit mode not raised');
         await screenshot('edit-mode');
+        // Make one free grid cell for the drag and resize interaction checks.
+        const noteRect = this._desktop.cards.get('note').rect;
+        assert(this._desktop.change('note', {...noteRect, x: noteRect.x + 1}, true), 'test space unavailable');
         const card = this._desktop.cards.get('clock');
         const initial = {...card.rect};
         const seat = global.stage.context.get_backend().get_default_seat();
