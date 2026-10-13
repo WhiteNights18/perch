@@ -2,6 +2,17 @@
 
 日期：2026-10-11。当前目标：`0.1.0-alpha.3`。
 
+## 2026-10-13 日常桌面安装
+
+- 本机版本复核：GNOME Shell 51.0、Mutter 51.0-2、GJS 1.90.0。
+- 重跑静态检查、布局/指标单元测试、GJS 持久化测试，全部通过；重新打包 alpha.3。
+- 安装至 `~/.local/share/gnome-shell/extensions/perch@perilla.local`，15 个发布文件逐字节匹配安装包，严格编译 schema 成功。
+- 安装包 SHA256：`2bd77d93e438e23c86c76ae79ea5536f99cf08d883798f638541a0e81550d4ea`。
+- 安装前没有同 UUID 扩展目录及 Perch 数据目录，没有覆盖既有便签。
+- 当前用户总线确认 GNOME Shell 正在运行，但当前 Shell 尚未发现新安装的 UUID，查询和启用返回 extension does not exist；没有 Perch 日志。未自动注销或重启 Shell。
+- 尝试加入启用列表后回读未保留，因此**未设置成功自动启用**。保存工作、注销并重新登录后执行 `gnome-extensions enable perch@perilla.local`，再用 `gnome-extensions info perch@perilla.local` 确认 `ACTIVE`。
+- 当前边界：文件安装完成；实际会话 ACTIVE、桌面可见性、与其他扩展共存仍待新登录会话验证。隔离会话的交互结果见下文，不能替代此项。
+
 ## alpha.3 原生组件风格重构
 
 - 使用 Cairo/Pango 绘制真实本地时间的指针钟面；秒针开关沿用既有设置键。
@@ -53,7 +64,7 @@
 
 ## 尚未验证
 
-- 用户当前桌面会话中的安装、中文输入法组合输入、锁屏/解锁、实际显示器热插拔和混合缩放。
+- 新登录会话中的 ACTIVE 状态及可见效果、中文输入法组合输入、锁屏/解锁、实际显示器热插拔和混合缩放。
 - 与 Desktop Icons NG、Blur my Shell 等扩展共同启用后的交互。
 - Shift + 方向键缩放已实现，但本轮没有单独的端到端输入断言。
 - 长时间运行的资源占用、崩溃恢复，以及不同字体/主题下的可访问性。
