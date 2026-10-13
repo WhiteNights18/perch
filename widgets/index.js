@@ -12,11 +12,14 @@ import {createCalendar} from './calendar.js';
 import {createFocus} from './focus.js';
 import {createMusic} from './music.js';
 import {createWeather} from './weather.js';
+import {createTask} from './task.js';
+import {createLauncher} from './launcher.js';
+import {textEditor} from '../lib/editor.js';
 import {createPhoto} from './photo.js';
 import {WIDGET_NAMES} from '../lib/sizes.js';
 
 export const TITLES = WIDGET_NAMES;
-export const ICONS = {clock: 'preferences-system-time-symbolic', note: 'document-edit-symbolic', system: 'system-run-symbolic', calendar: 'x-office-calendar-symbolic', focus: 'alarm-symbolic', music: 'audio-x-generic-symbolic', weather: 'weather-clear-symbolic', photo: 'image-x-generic-symbolic'};
+export const ICONS = {clock: 'preferences-system-time-symbolic', note: 'document-edit-symbolic', system: 'system-run-symbolic', calendar: 'x-office-calendar-symbolic', focus: 'alarm-symbolic', music: 'audio-x-generic-symbolic', weather: 'weather-clear-symbolic', photo: 'image-x-generic-symbolic', task: 'view-list-symbolic', launcher: 'view-app-grid-symbolic'};
 
 function column(style = '') {
     return new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: style, x_expand: true, y_expand: true, clip_to_allocation: true});
@@ -27,10 +30,12 @@ function label(text, style) {
 }
 
 export function createWidget(type, settings, store) {
+    if (type === 'task') return createTask(store);
+    if (type === 'launcher') return createLauncher(settings);
     if (type === 'photo') return createPhoto(settings);
     if (type === 'calendar') return createCalendar();
     if (type === 'focus') return createFocus(settings, store);
-    if (type === 'music') return createMusic();
+    if (type === 'music') return createMusic(settings);
     if (type === 'weather') return createWeather(settings);
     const actor = column(`perch-content perch-${type}`);
     if (type === 'clock') {
@@ -38,6 +43,9 @@ export function createWidget(type, settings, store) {
         const date = label('', 'perch-clock-date');
         date.x_align = Clutter.ActorAlign.CENTER;
         actor.add_child(face);
+        const time = label('', 'perch-clock-time');
+        time.x_align = Clutter.ActorAlign.CENTER;
+        actor.add_child(time);
         actor.add_child(date);
         const seconds = settings.get_boolean('show-seconds');
         face.connect('repaint', area => {
@@ -86,56 +94,47 @@ export function createWidget(type, settings, store) {
             cr.fill();
             cr.$dispose();
         });
+        let lastMinute = '';
         const update = () => {
             const now = GLib.DateTime.new_now_local();
+            const minute = now.format('%Y%m%d%H%M');
+            if (!seconds && minute === lastMinute) return GLib.SOURCE_CONTINUE;
+            lastMinute = minute;
             const weekday = ['一', '二', '三', '四', '五', '六', '日'][now.get_day_of_week() - 1];
+            time.text = now.format(seconds ? '%H:%M:%S' : '%H:%M');
             date.text = `${now.get_month()}月${now.get_day_of_month()}日  周${weekday}`;
             face.accessible_name = now.format('%H:%M:%S');
             face.queue_repaint();
             return GLib.SOURCE_CONTINUE;
         };
         update();
-        const id = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds ? 1 : 15, update);
-        return {actor, date, destroy() { GLib.Source.remove(id); }};
+        const id = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, update);
+        return {actor, date, time, destroy() { GLib.Source.remove(id); }};
     }
     if (type === 'note') {
-        const entry = new St.Entry({
-            text: store.state.note,
-            hint_text: '留下一点想法…',
-            style_class: 'perch-note-entry',
-            can_focus: true,
-            x_expand: true,
-            y_expand: false,
-            y_align: Clutter.ActorAlign.START,
-            accessible_name: '便签内容，自动保存',
+        const summary = text => text.split('\n').slice(0, 12).join('\n').slice(0, 700);
+        const preview = label(summary(store.state.note) || '点击记录一点想法…', 'perch-note-preview');
+        preview.x_expand = preview.y_expand = true;
+        preview.y_align = Clutter.ActorAlign.START;
+        preview.clutter_text.set_line_wrap(true);
+        preview.clutter_text.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR);
+        const editor = textEditor('备忘录 · 自动保存', store.state.note, MAX_NOTE_LENGTH, text => {
+            if (!store.writable) return;
+            store.state.note = text;
+            preview.text = summary(text) || '点击记录一点想法…';
+            store.changed();
         });
-        entry.clutter_text.set_single_line_mode(false);
-        entry.clutter_text.set_activatable(false);
-        entry.clutter_text.set_line_wrap(true);
-        entry.clutter_text.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR);
-        entry.clutter_text.set_max_length(MAX_NOTE_LENGTH);
-        entry.clutter_text.set_editable(store.writable);
-        if (!store.writable)
-            entry.hint_text = '原数据暂不可用，请查看顶栏提示';
-        const scroll = new St.ScrollView({x_expand: true, y_expand: true, overlay_scrollbars: true});
-        scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
-        const body = column();
-        body.add_child(entry);
-        scroll.set_child(body);
+        editor.entry.clutter_text.set_editable(store.writable);
         const heading = new St.BoxLayout({style_class: 'perch-note-heading'});
         heading.add_child(new St.Icon({icon_name: 'document-edit-symbolic', icon_size: 18}));
         heading.add_child(label('备忘录', 'perch-note-heading-text'));
         actor.add_child(heading);
-        scroll.style_class = 'perch-note-paper';
-        actor.add_child(scroll);
-        if (!store.writable)
-            actor.add_child(label('只读保护 · 未覆盖原文件', 'perch-caption perch-note-status'));
-        entry.clutter_text.connect('text-changed', () => {
-            store.state.note = entry.get_text();
-            store.changed();
-        });
-        return {actor, entry, destroy() {}};
+        const open = new St.Button({child: preview, can_focus: true, x_expand: true, y_expand: true, style_class: 'perch-note-paper', clip_to_allocation: true, accessible_name: '编辑备忘录'});
+        open.connect('clicked', () => editor.open());
+        actor.add_child(open);
+        return {actor, entry: editor.entry, openButton: open, openEditor: () => editor.open(), editor, destroy() { editor.destroy(); }};
     }
+
     const gauges = new St.BoxLayout({style_class: 'perch-gauges', x_expand: true, y_expand: true});
     const cpu = gauge('处理器', 'perch-cpu');
     const ram = gauge('内存', 'perch-memory');

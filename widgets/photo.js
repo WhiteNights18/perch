@@ -32,6 +32,7 @@ export function createPhoto(settings) {
     controls.visible = false;
     actor.add_child(controls);
     const path = settings.get_string('photo-source');
+    const positionKey = `${settings.instanceId ?? 'photo'}:${path}`;
     let files = [];
     let index = -1;
     let pixbuf = null;
@@ -77,7 +78,7 @@ export function createPhoto(settings) {
                     if (closed || cancel !== loadCancel) return;
                     pixbuf = result;
                     current = files[index];
-                    positions.set(path, current);
+                    positions.set(positionKey, current);
                     if (positions.size > 16) positions.delete(positions.keys().next().value);
                     paint();
                     empty.visible = false;
@@ -126,7 +127,7 @@ export function createPhoto(settings) {
                 } catch (_) { /* Manual reselect still refreshes on filesystems without monitors. */ }
             }
             if (!files.length) { clear('文件夹里还没有可用图片'); return; }
-            const remembered = current || positions.get(path);
+            const remembered = current || positions.get(positionKey);
             index = Math.max(0, files.indexOf(remembered)) - 1;
             await show(1);
         } catch (_error) {

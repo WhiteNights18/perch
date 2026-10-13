@@ -29,6 +29,8 @@ gsettings set org.gnome.shell enabled-extensions "['perch@perilla.local']"
 gsettings set org.gnome.shell disable-user-extensions false
 gsettings set org.gnome.shell welcome-dialog-last-shown-version '51.0'
 gsettings set org.gnome.desktop.session idle-delay 0
+# Virtual devices begin at (0,0); keep that from triggering the overview.
+gsettings set org.gnome.desktop.interface enable-hot-corners false
 gsettings set org.gnome.desktop.background picture-uri ''
 gsettings set org.gnome.desktop.background picture-uri-dark ''
 gsettings set org.gnome.desktop.background primary-color '#253c46'

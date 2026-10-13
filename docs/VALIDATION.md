@@ -1,6 +1,6 @@
 # 验证记录
 
-当前版本：**0.2.0-alpha.2**。照片和尺寸测试见 [本轮验证记录](PHOTOS-SIZES-VALIDATION.md)，上一轮组件测试见 [四类组件记录](COMPONENTS-VALIDATION.md)。以下保留旧版历史记录。
+当前版本：**0.3.0-alpha.1**。本轮见 [紧凑组件与交互验证](COMPACT-INTERACTION-VALIDATION.md)，照片和尺寸测试见 [本轮验证记录](PHOTOS-SIZES-VALIDATION.md)，上一轮组件测试见 [四类组件记录](COMPONENTS-VALIDATION.md)。以下保留旧版历史记录。
 
 日期：2026-10-11。当前目标：`0.1.0-alpha.3`。
 

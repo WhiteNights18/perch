@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import {photoInstances} from './lib/instances.js';
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
@@ -24,12 +25,15 @@ export default class PerchPreferences extends ExtensionPreferences {
         const page = new Adw.PreferencesPage({title: '栖格', icon_name: 'view-grid-symbolic'});
         window.add(page);
         addPhotoAndSizePage(window, settings);
+        addApplicationsPage(window, settings);
         const appearance = new Adw.PreferencesGroup({title: '你的桌面，一目了然', description: '栖格 Perch · 轻盈、清晰的桌面组件'});
         page.add(appearance);
         const themes = ['system', 'light', 'dark'];
         const theme = new Adw.ComboRow({title: '卡片主题', model: Gtk.StringList.new(['跟随系统', '浅色', '深色']), selected: Math.max(0, themes.indexOf(settings.get_string('theme')))});
         theme.connect('notify::selected', () => settings.set_string('theme', themes[theme.selected]));
         appearance.add(theme);
+        const scale = new Adw.SpinRow({title: '组件整体大小', subtitle: '默认 75%；可在 50%–125% 之间调整', adjustment: new Gtk.Adjustment({lower: 50, upper: 125, step_increment: 5, value: settings.get_double('widget-scale') * 100})});
+        scale.connect('notify::value', () => settings.set_double('widget-scale', scale.value / 100)); appearance.add(scale);
         const addSwitch = (group, key, title, subtitle = '') => {
             const row = new Adw.SwitchRow({title, subtitle});
             settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
@@ -43,7 +47,7 @@ export default class PerchPreferences extends ExtensionPreferences {
         addSwitch(widgets, 'show-note', '随手记');
         addSwitch(widgets, 'show-photo', '照片与轮播');
         addSwitch(widgets, 'show-system', '系统状态');
-        for (const [key, title] of [['calendar', '月历'], ['focus', '番茄钟'], ['music', '音乐控制'], ['weather', '天气']])
+        for (const [key, title] of [['calendar', '月历'], ['focus', '番茄钟'], ['music', '音乐控制'], ['weather', '天气'], ['task', '任务清单'], ['launcher', '应用启动器']])
             addSwitch(widgets, `show-${key}`, title);
         const interval = new Adw.SpinRow({title: '系统监控刷新间隔', subtitle: '单位：秒', adjustment: new Gtk.Adjustment({lower: 2, upper: 30, step_increment: 1, page_increment: 5})});
         settings.bind('sample-seconds', interval, 'value', Gio.SettingsBindFlags.DEFAULT);
@@ -158,6 +162,7 @@ function addPhotoAndSizePage(window, settings) {
     const paused = new Adw.SwitchRow({title: '暂停自动轮播'});
     settings.bind('photo-paused', paused, 'active', Gio.SettingsBindFlags.DEFAULT);
     photos.add(paused);
+    addExtraPhotos(page, window, settings);
     const sizes = new Adw.PreferencesGroup({title: '组件尺寸', description: '宽 × 高。2 × 2 为小方卡，3 × 3 为大方卡，2 × 4 为竖版。选择规格即调整；空间不足时保留原尺寸。也可在桌面编辑模式拖动右下角自由缩放。'});
     page.add(sizes);
     for (const [type, presets] of Object.entries(SIZE_PRESETS)) {
@@ -172,4 +177,63 @@ function addPhotoAndSizePage(window, settings) {
         });
         sizes.add(row);
     }
+}
+
+function addApplicationsPage(window, settings) {
+    const page = new Adw.PreferencesPage({title: '应用', icon_name: 'view-app-grid-symbolic'}); window.add(page);
+    const apps = Gio.AppInfo.get_all().filter(a => a.should_show() && a.get_id()).sort((a, b) => a.get_display_name().localeCompare(b.get_display_name(), 'zh-CN'));
+    const ids = ['', ...apps.map(a => a.get_id())];
+    const names = ['未选择', ...apps.map(a => a.get_display_name())];
+    const music = new Adw.PreferencesGroup({title: '音乐播放器', description: '点击封面或空闲时的播放按钮打开所选播放器。读取播放器提供的封面与歌词；也支持歌曲旁同名 .lrc 文件。'}); page.add(music);
+    const player = new Adw.ComboRow({title: '默认播放器', model: Gtk.StringList.new(names), selected: Math.max(0, ids.indexOf(settings.get_string('music-player')))});
+    player.connect('notify::selected', () => settings.set_string('music-player', ids[player.selected])); music.add(player);
+    const group = new Adw.PreferencesGroup({title: '应用启动器', description: '最多九个快捷入口，点击即可打开或切换到应用。'}); page.add(group);
+    const selection = settings.get_strv('launcher-apps').slice(0, 9);
+    for (let i = 0; i < 9; i++) {
+        const row = new Adw.ComboRow({title: `应用 ${i + 1}`, model: Gtk.StringList.new(names), selected: Math.max(0, ids.indexOf(selection[i] || ''))});
+        row.connect('notify::selected', () => { selection[i] = ids[row.selected]; settings.set_strv('launcher-apps', [...new Set(selection.filter(Boolean))]); }); group.add(row);
+    }
+}
+
+function addExtraPhotos(page, window, settings) {
+    const group = new Adw.PreferencesGroup({title: '独立相框', description: '最多新增八个相框，每个分别保存来源、大小、位置和轮播状态。'}); page.add(group);
+    const rows = [];
+    const write = (id, changes) => settings.set_string('photo-instances', JSON.stringify(photoInstances(settings).map(p => p.id === id ? {...p, ...changes} : p)));
+    const cancel = new Gio.Cancellable(); window.connect('close-request', () => { cancel.cancel(); return false; });
+    function draw() {
+        for (const row of rows) group.remove(row); rows.length = 0;
+        for (const p of photoInstances(settings)) {
+            const row = new Adw.ExpanderRow({title: GLib.path_get_basename(p.source), subtitle: p.source});
+            group.add(row); rows.push(row);
+            const remove = new Gtk.Button({icon_name: 'user-trash-symbolic', valign: Gtk.Align.CENTER, tooltip_text: '移除此相框，保留原图'});
+            remove.connect('clicked', () => { settings.set_string('photo-instances', JSON.stringify(photoInstances(settings).filter(x => x.id !== p.id))); draw(); }); row.add_suffix(remove);
+            const fit = new Adw.ComboRow({title: '图片呈现', model: Gtk.StringList.new(['填满卡片', '完整显示']), selected: p.fit === 'contain' ? 1 : 0});
+            fit.connect('notify::selected', () => write(p.id, {fit: fit.selected ? 'contain' : 'cover'})); row.add_row(fit);
+            const interval = new Adw.SpinRow({title: '轮播间隔（秒）', adjustment: new Gtk.Adjustment({lower: 5, upper: 3600, step_increment: 5, value: p.interval})});
+            interval.connect('notify::value', () => write(p.id, {interval: Math.round(interval.value)})); row.add_row(interval);
+            const pause = new Adw.SwitchRow({title: '暂停轮播', active: p.paused}); pause.connect('notify::active', () => write(p.id, {paused: pause.active})); row.add_row(pause);
+            const presets = SIZE_PRESETS.photo;
+            const size = new Adw.ComboRow({title: '尺寸', model: Gtk.StringList.new(['选择尺寸…', ...presets.map(([w,h]) => `${w} × ${h}`)])});
+            size.connect('notify::selected', () => { if (!size.selected) return; const [w,h] = presets[size.selected - 1]; settings.set_value('size-request', new GLib.Variant('(suuu)', [p.id,w*4,h*4,(settings.get_value('size-request').deep_unpack()[3]+1)>>>0])); size.selected = 0; }); row.add_row(size);
+        }
+    }
+    const add = new Adw.ActionRow({title: '新增相框'}); group.add(add);
+    for (const [folder, title] of [[false, '选择图片'], [true, '选择文件夹']]) {
+        const button = new Gtk.Button({label: title, valign: Gtk.Align.CENTER}); add.add_suffix(button);
+        button.connect('clicked', () => {
+            if (photoInstances(settings).length >= 8) { window.add_toast(new Adw.Toast({title: '最多新增八个相框'})); return; }
+            const dialog = new Gtk.FileDialog({title: '新增独立相框'});
+            const done = (d,r) => {
+                try {
+                    const path = (folder ? d.select_folder_finish(r) : d.open_finish(r)).get_path();
+                    if (!path || cancel.is_cancelled()) return;
+                    const current = photoInstances(settings); if (current.length >= 8) return;
+                    current.push({id: `photo-${GLib.uuid_string_random()}`, source: path, fit: 'cover', interval: 30, paused: false});
+                    settings.set_string('photo-instances', JSON.stringify(current)); draw();
+                } catch (_) { /* The chooser was cancelled. */ }
+            };
+            if (folder) dialog.select_folder(window,cancel,done); else dialog.open(window,cancel,done);
+        });
+    }
+    draw();
 }

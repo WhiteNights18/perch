@@ -43,3 +43,8 @@ GNOME Shell 51 原生桌面组件。以 Gridgets 的网格组织方式为参考�
 - https://gjs.guide/extensions/review-guidelines/review-guidelines.html — 生命周期与发布检查。
 
 本项目采用 GPL-3.0-only。未复制 Gridgets 的组件实现或资源。
+
+
+### 0.3.0-alpha.1
+
+紧凑缩放、连续拖动、备忘录焦点编辑、数字时间、Amberol 启动与本地封面/歌词、任务、应用启动器和照片多实例。其他组件多实例、远程歌词服务及多屏独立布局仍在后续范围。

@@ -22,5 +22,11 @@
     <key name="photo-fit" type="s"><default>'cover'</default><choices><choice value="cover"/><choice value="contain"/></choices><summary>照片填充方式</summary></key>
     <key name="photo-paused" type="b"><default>false</default><summary>暂停图片轮播</summary></key>
     <key name="size-request" type="(suuu)"><default>('', 0, 0, 0)</default><summary>组件尺寸调整请求</summary></key>
+    <key name="widget-scale" type="d"><default>0.75</default><range min="0.5" max="1.25"/><summary>整体组件缩放</summary></key>
+    <key name="photo-instances" type="s"><default>'[]'</default><summary>独立照片相框</summary></key>
+    <key name="show-task" type="b"><default>true</default><summary>显示任务</summary></key>
+    <key name="show-launcher" type="b"><default>true</default><summary>显示应用启动器</summary></key>
+    <key name="music-player" type="s"><default>'io.bassi.Amberol.desktop'</default><summary>音乐播放器 desktop ID</summary></key>
+    <key name="launcher-apps" type="as"><default>['io.bassi.Amberol.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Settings.desktop']</default><summary>启动器应用</summary></key>
   </schema>
 </schemalist>

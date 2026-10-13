@@ -68,7 +68,8 @@ export default class TestPerch extends Perch {
     enable() {
         if (!this._started) {
             const settings = this.getSettings();
-            for (const type of ['calendar', 'focus', 'music', 'weather']) settings.set_boolean(`show-${type}`, false);
+            settings.set_double('widget-scale', 1);
+            for (const type of ['calendar', 'focus', 'music', 'weather', 'task', 'launcher']) settings.set_boolean(`show-${type}`, false);
         }
         super.enable();
         if (!this._started) {
@@ -97,7 +98,86 @@ export default class TestPerch extends Perch {
         }
     }
 
+    async _newFeatures(keyboard, pointer) {
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), 400, 400);
+        await delay(200); Main.overview.hide(); await delay(600);
+        const click = async actor => {
+            const [x,y] = actor.get_transformed_position();
+            const [w,h] = actor.get_transformed_size();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), x+w/2, y+h/2);
+            await delay(120);
+            pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.PRESSED);
+            await delay(100);
+            pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.RELEASED);
+            await delay(250);
+        };
+        this._settings.set_double('widget-scale', 0.75);
+        this._settings.set_boolean('show-task', true);
+        this._settings.set_boolean('show-launcher', true);
+        const ids = ['photo-aaaaaaaa', 'photo-bbbbbbbb'];
+        this._settings.set_string('photo-instances', JSON.stringify(ids.map((id,i) => ({id, source: `${output}/photos/photo${i+1}.png`, fit: 'cover', interval: 30, paused: true}))));
+        await delay(1500);
+        assert(this._desktop.actor.scale_x === 0.75, 'compact scale not applied');
+        assert(this._desktop.cards.get('clock')._widget.time.text.includes(':'), 'digital clock missing');
+        for (const id of ids) assert(this._desktop.cards.get(id)?._widget.loaded, 'independent photo not loaded');
+        const task = this._desktop.cards.get('task')._widget;
+        await click(task.addButton); await delay(350);
+        task.editor.entry.grab_key_focus();
+        for (const char of 'Buy milk') {
+            keyboard.notify_keyval(GLib.get_monotonic_time(), char.codePointAt(0), Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time(), char.codePointAt(0), Clutter.KeyState.RELEASED);
+        }
+        await delay(200);
+        assert(task.editor.entry.get_text() === 'Buy milk', 'task keyboard entry failed');
+        task.editor.dialog.close(); await delay(350);
+        assert(this._store.state.tasks.some(t => t.text === 'Buy milk'), 'task not saved');
+        await click(task.list.get_children()[0].get_children()[0]);
+        assert(this._store.state.tasks[0].done, 'task checkbox click failed');
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), 400, 400);
+        Main.overview.hide();
+        await delay(600);
+        const first = this._desktop.cards.get(ids[0]);
+        this._desktop.setEditing(true);
+        await delay(300);
+        const start = {...first.rect};
+        const [x,y] = first._header.get_transformed_position();
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(),x+40,y+12); await delay(100);
+        pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.PRESSED); await delay(100);
+        for (let n=1;n<=6;n++) { pointer.notify_absolute_motion(GLib.get_monotonic_time(),x+40+n*5,y+12); await delay(60); }
+        assert(first.actor.translation_x !== 0 && first.rect.x === start.x, `drag preview failed: offset=${first.actor.translation_x}, active=${Boolean(first._start)}, pointer=${global.get_pointer()}, target=${x},${y}`);
+        pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.RELEASED); await delay(250);
+        assert(first.actor.translation_x === 0, 'drag transform not cleared');
+        this._desktop.setEditing(false);
+        await delay(600);
+        assert(this._desktop.actor.visible && global.window_group.visible, 'desktop hidden after drag');
+        await screenshot('compact-widgets');
+        await assertCardPaint(this._desktop, 'compact-widgets');
+        const frameRect = {...first.rect};
+        await this._store.flush(); super.disable(); super.enable(); await delay(1000);
+        assert(this._store.state.tasks.some(t => t.text === 'Buy milk'), 'tasks lost on restart');
+        assert(JSON.stringify(this._desktop.cards.get(ids[0]).rect) === JSON.stringify(frameRect), 'frame position lost');
+        const music = this._desktop.cards.get('music')._widget;
+        assert(music.toggle.reactive, 'empty player button should launch app');
+        Main.overview.hide(); await delay(300);
+        await click(music.toggle); await delay(2500);
+        assert(global.get_window_actors().some(a => /amberol/i.test(a.meta_window.get_title() ?? '')), 'Amberol was not opened');
+        await screenshot('amberol-launch');
+        for (const actor of global.get_window_actors()) if (/amberol/i.test(actor.meta_window.get_title() ?? '')) actor.meta_window.delete(global.get_current_time());
+        await delay(600); Main.overview.hide(); await delay(400);
+        await click(this._desktop.cards.get('launcher')._widget.grid.get_children()[0]); await delay(2000);
+        assert(global.get_window_actors().some(a => /amberol/i.test(a.meta_window.get_title() ?? '')), 'launcher did not open app');
+        for (const actor of global.get_window_actors()) if (/amberol/i.test(actor.meta_window.get_title() ?? '')) actor.meta_window.delete(global.get_current_time());
+    }
+
     async _run() {
+        if (GLib.getenv('PERCH_FEATURES_ONLY')) {
+            await delay(5500); Main.overview.hide(); Main.welcomeDialog?.close();
+            for (const type of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${type}`, true);
+            this._settings.set_string('photo-source', `${output}/photos`);
+            await delay(500);
+            const seat = global.stage.context.get_backend().get_default_seat();
+            return this._newFeatures(seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE), seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE));
+        }
         if (GLib.getenv('PERCH_PAINT_ONLY')) return this._paintStress();
         await delay(5500);
         Main.overview.hide();
@@ -112,7 +192,11 @@ export default class TestPerch extends Perch {
         const entry = this._desktop.cards.get('note')._widget.entry;
         entry.set_text('今天，留一点时间给自己。\n\n□ 整理课程笔记\n□ 完成一个小目标\n□ 出门散步');
         await delay(3500);
+        this._desktop.cards.get('note')._widget.openEditor();
+        await delay(350);
         const fonts = checkFonts([entry.clutter_text, this._desktop.cards.get('clock')._widget.date.clutter_text]);
+        this._desktop.cards.get('note')._widget.editor.dialog.close();
+        await delay(250);
         await screenshot('desktop-dark');
         this._indicator.menu.open();
         await delay(300);
@@ -175,12 +259,17 @@ export default class TestPerch extends Perch {
         await delay(200);
         assert(!this._desktop.editing, 'Escape did not finish editing');
         this._desktop.setEditing(false);
+        this._desktop.cards.get('note')._widget.openEditor();
+        await delay(300);
         entry.grab_key_focus();
         entry.clutter_text.set_cursor_position(-1);
         keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_x, Clutter.KeyState.PRESSED);
         keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_x, Clutter.KeyState.RELEASED);
         await delay(200);
         assert(this._store.state.note.endsWith('x'), 'keyboard typing in note failed');
+        await screenshot('memo-editor');
+        this._desktop.cards.get('note')._widget.editor.dialog.close();
+        await delay(250);
         entry.set_text(entry.get_text().slice(0, -1));
         assert(this._store.state.note.includes('课程笔记'), 'note change was not captured');
         this._settings.set_boolean('show-note', false);
@@ -250,7 +339,12 @@ export default class TestPerch extends Perch {
             fixture.lock();
             await delay(250);
             assert(!music.toggle.reactive && !music.next.reactive, 'MPRIS capability flags ignored');
+            await delay(1200);
+            assert(music.art.content !== null && music.actor.get_style().includes('gradient'), 'album cover or palette missing');
+            assert(music.lyric.text === '测试歌词第二句', `lyrics not synced: ${music.lyric.text}`);
             await screenshot('music-fixture');
+            fixture.localLyrics(); await delay(1600);
+            assert(music.lyric.text === '本地歌词第二句', 'sidecar LRC did not load and sync');
         } finally { fixture.destroy(); }
         await delay(400);
         assert(this._desktop.cards.get('music')._widget.service.state === null, 'closed player retained');
@@ -413,5 +507,8 @@ export default class TestPerch extends Perch {
         await delay(1200);
         assertBelowWindows();
         await screenshot('photo-preferences');
+        for (const window of global.get_window_actors()) if (/Perch|栖格/.test(window.meta_window.get_title() ?? '')) window.meta_window.delete(global.get_current_time());
+        await delay(500);
+        await this._newFeatures(keyboard, pointer);
     }
 }

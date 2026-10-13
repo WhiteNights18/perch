@@ -99,3 +99,24 @@
 .perch-photo-controls { background-color: rgba(20,27,36,0.78); color: white; border-radius: 20px; spacing: 1px; margin: 12px; padding: 2px 6px; }
 .perch-photo-controls .perch-action { padding: 6px; }
 .perch-photo-count { font-family: "Noto Sans"; font-size: 9pt; padding: 7px 4px; }
+
+/* Compact interactive widgets */
+.perch-clock-time { font-family: "Noto Sans"; font-size: 18pt; font-weight: 600; }
+.perch-note-preview { font-size: 11pt; text-align: left; }
+.perch-note-paper:focus { background-color: rgba(128,128,128,0.08); }
+.perch-editor-title { font-size: 16pt; font-weight: bold; margin-bottom: 12px; }
+.perch-editor-scroll { width: 540px; height: 320px; }
+.perch-editor-single { width: 440px; }
+.perch-editor-entry { padding: 14px; min-height: 32px; }
+.perch-tasks { spacing: 10px; }
+.perch-task-row { spacing: 4px; }
+.perch-task-text, .perch-task-done { text-align: left; font-size: 11pt; padding: 6px 0; }
+.perch-task-done { color: #8b9391; }
+.perch-launcher { spacing: 8px; }
+.perch-launcher-app { padding: 8px; border-radius: 12px; }
+.perch-launcher-app:hover, .perch-launcher-app:focus { background-color: rgba(128,128,128,0.15); }
+.perch-launcher-name { font-size: 8pt; max-width: 62px; }
+.perch-music { padding: 14px; spacing: 6px; border-radius: 23px; }
+.perch-music-art { padding: 16px; }
+.perch-music-lyric { color: #f7ecef; font-size: 10pt; }
+.perch-desktop .perch-card.perch-card-photo { border: 0; box-shadow: none; background-color: transparent; }
