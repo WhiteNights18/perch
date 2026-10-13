@@ -28,5 +28,10 @@
     <key name="show-launcher" type="b"><default>true</default><summary>显示应用启动器</summary></key>
     <key name="music-player" type="s"><default>'io.bassi.Amberol.desktop'</default><summary>音乐播放器 desktop ID</summary></key>
     <key name="launcher-apps" type="as"><default>['io.bassi.Amberol.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Settings.desktop']</default><summary>启动器应用</summary></key>
+    <key name="note-popup" type="b"><default>true</default></key>
+    <key name="note-show-date" type="b"><default>true</default></key>
+    <key name="launcher-labels" type="b"><default>true</default></key>
+    <key name="focus-sound" type="b"><default>false</default></key>
+    <key name="launcher-auto-size" type="b"><default>true</default></key>
   </schema>
 </schemalist>

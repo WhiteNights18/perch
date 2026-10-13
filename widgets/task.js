@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import St from 'gi://St';
+import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import {column, label, button} from './ui.js';
 import {textEditor} from '../lib/editor.js';
@@ -16,9 +17,11 @@ export function createTask(store) {
         const tasks = store.state.tasks;
         summary.text = `${tasks.filter(t => t.done).length} / ${tasks.length} 已完成`;
         if (!tasks.length) list.add_child(label('给今天安排一件小事', 'perch-caption'));
-        for (const task of tasks) {
+        for (const task of [...tasks].sort((a, b) => Number(a.done) - Number(b.done))) {
             const row = new St.BoxLayout({style_class: 'perch-task-row'});
             const toggle = new St.Button({child: label(`${task.done ? '☑' : '☐'}  ${task.text}`), can_focus: true, x_expand: true, style_class: task.done ? 'perch-task-done' : 'perch-task-text'});
+            toggle.x_align = Clutter.ActorAlign.START;
+            toggle.child.x_align = Clutter.ActorAlign.START;
             toggle.connect('clicked', () => { if (!store.writable) return; task.done = !task.done; store.changed(); draw(); });
             row.add_child(toggle);
             row.add_child(button('window-close-symbolic', '删除任务', () => { if (!store.writable) return; store.state.tasks = tasks.filter(t => t.id !== task.id); store.changed(); draw(); }));

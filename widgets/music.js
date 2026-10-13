@@ -14,24 +14,24 @@ import {parseLyrics, lyricAt} from '../lib/lyrics.js';
 import {column, label, button, sensitive} from './ui.js';
 
 export function createMusic(settings) {
-    const actor = column('perch-content perch-music');
+    const actor = new St.BoxLayout({style_class: 'perch-content perch-music', x_expand: true, y_expand: true});
+    const main = column('perch-music-main'); actor.add_child(main);
     const top = new St.BoxLayout({style_class: 'perch-music-top', y_expand: true});
     const art = new St.Widget({width: 72, height: 72, y_align: Clutter.ActorAlign.CENTER, layout_manager: new Clutter.BinLayout()});
     const fallback = new St.Icon({icon_name: 'audio-x-generic-symbolic', icon_size: 36, style_class: 'perch-music-art'}); art.add_child(fallback);
     const artButton = new St.Button({child: art, can_focus: true, accessible_name: '打开音乐播放器'});
     top.add_child(artButton);
     const text = column('perch-music-text'); text.y_align = Clutter.ActorAlign.CENTER;
-    const eyebrow = label('现在播放', 'perch-music-eyebrow');
     const title = label('打开音乐播放器', 'perch-music-title');
     const artist = label('', 'perch-music-artist');
-    [eyebrow, title, artist].forEach(c => text.add_child(c)); top.add_child(text); actor.add_child(top);
-    const lyric = label('暂无歌词', 'perch-music-lyric'); actor.add_child(lyric);
+    [title, artist].forEach(c => text.add_child(c)); top.add_child(text); main.add_child(top);
+    const lyric = label('', 'perch-music-lyric'); lyric.visible = false; lyric.y_align = Clutter.ActorAlign.CENTER; lyric.x_expand = true; lyric.clutter_text.set_line_wrap(true); actor.add_child(lyric);
     const controls = new St.BoxLayout({style_class: 'perch-music-controls', x_align: Clutter.ActorAlign.CENTER});
     const previous = button('media-skip-backward-symbolic', '上一首', () => service.command('Previous'));
     const toggle = button('media-playback-start-symbolic', '播放或打开播放器', () => service.state ? service.command('PlayPause') : launch());
     const next = button('media-skip-forward-symbolic', '下一首', () => service.command('Next'));
-    [previous, toggle, next].forEach(b => controls.add_child(b)); actor.add_child(controls);
-    const source = new St.Button({label: '打开播放器', style_class: 'perch-music-source', can_focus: true}); actor.add_child(source);
+    [previous, toggle, next].forEach(b => controls.add_child(b)); main.add_child(controls);
+    const source = new St.Button({label: '打开播放器', style_class: 'perch-music-source', can_focus: true}); main.add_child(source);
     const playerId = settings.get_string('music-player');
     const appName = GioUnix.DesktopAppInfo.new(playerId)?.get_display_name() ?? '播放器';
     const launch = () => launchApp(playerId);
@@ -44,8 +44,9 @@ export function createMusic(settings) {
         mediaKey = key; coverKey = cover;
         cancel.cancel(); cancel = new Gio.Cancellable(); const request = cancel;
         lines = parseLyrics(state?.lyrics ?? '');
-        lyric.text = lines[0]?.text || state?.lyrics?.split('\n').find(s => s.trim()) || '暂无歌词 · 可放入同名 .lrc';
-        fallback.visible = true; art.content = null; actor.set_style('');
+        lyric.text = lines[0]?.text || state?.lyrics?.split('\n').find(s => s.trim()) || '';
+        lyric.visible = Boolean(lyric.text);
+        fallback.visible = true; art.content = null; actor.get_parent()?.set_style('');
         if (cover.startsWith('file://')) {
             try {
                 const file = Gio.File.new_for_uri(cover);
@@ -57,7 +58,7 @@ export function createMusic(settings) {
                 art.content = content; fallback.visible = false;
                 const average = pixbuf.scale_simple(1, 1, GdkPixbuf.InterpType.BILINEAR).read_pixel_bytes().get_data();
                 const color = factor => `rgb(${Array.from(average.slice(0, 3), c => Math.round(c * factor + 14)).join(',')})`;
-                actor.set_style(`background-gradient-direction: vertical; background-gradient-start: ${color(0.42)}; background-gradient-end: ${color(0.16)};`);
+                actor.get_parent()?.set_style(`background-gradient-direction: vertical; background-gradient-start: ${color(0.42)}; background-gradient-end: ${color(0.16)};`);
             } catch (_) { /* Keep the neutral cover and palette. */ }
         }
         if (!state?.lyrics && state?.url?.startsWith('file://')) {
@@ -68,7 +69,7 @@ export function createMusic(settings) {
                 if (info.get_size() > 200000) return;
                 const value = await readText(lrc.get_path(), request);
                 if (closed || request !== cancel) return;
-                lines = parseLyrics(value); lyric.text = lines[0]?.text || value.split('\n').find(s => s.trim()) || '暂无歌词';
+                lines = parseLyrics(value); lyric.text = lines[0]?.text || value.split('\n').find(s => s.trim()) || ''; lyric.visible = Boolean(lyric.text);
             } catch (_) { /* Local lyrics are optional. */ }
         }
     }
@@ -76,7 +77,6 @@ export function createMusic(settings) {
         if (closed) return;
         title.text = state?.title || `打开 ${appName}`;
         artist.text = error || state?.artist || (state ? '未知艺术家' : '点击封面或播放按钮');
-        eyebrow.text = state?.playing ? '正在播放' : state ? '已暂停' : '音乐';
         source.label = state && state.count > 1 ? '切换播放器' : `打开 ${appName}`;
         toggle.child.icon_name = state?.playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
         sensitive(previous, state?.previous); sensitive(next, state?.next); sensitive(toggle, !state || state.toggle);

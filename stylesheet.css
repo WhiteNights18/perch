@@ -120,3 +120,17 @@
 .perch-music-art { padding: 16px; }
 .perch-music-lyric { color: #f7ecef; font-size: 10pt; }
 .perch-desktop .perch-card.perch-card-photo { border: 0; box-shadow: none; background-color: transparent; }
+
+/* Native-size rendering, uncluttered music and continuous edit outline. */
+.perch-desktop .perch-card.perch-card-music { border: 0; }
+.perch-music { background-color: transparent; spacing: 16px; }
+.perch-music-main { spacing: 4px; }
+.perch-music-lyric { max-width: 180px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.16); }
+.perch-music-title { font-size: 13pt; }
+.perch-calendar-today:hover { background-color: rgba(128,128,128,0.12); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+.perch-note-modified { font-size: 8pt; color: #796223; }
+.perch-note-scroll { padding: 12px; }
+.perch-focus-preset { padding: 3px 10px; border-radius: 8px; font-size: 9pt; }
+.perch-focus-preset:hover, .perch-focus-preset:focus { background-color: rgba(237,121,76,0.2); }
+.perch-photo-remove { color: white; background-color: rgba(35,40,48,0.9); padding: 8px; margin: 7px; border-radius: 12px; }
+.perch-edit-outline { border: 2px solid #83b6f6; border-radius: 24px; }

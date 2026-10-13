@@ -117,7 +117,7 @@ export default class TestPerch extends Perch {
         const ids = ['photo-aaaaaaaa', 'photo-bbbbbbbb'];
         this._settings.set_string('photo-instances', JSON.stringify(ids.map((id,i) => ({id, source: `${output}/photos/photo${i+1}.png`, fit: 'cover', interval: 30, paused: true}))));
         await delay(1500);
-        assert(this._desktop.actor.scale_x === 0.75, 'compact scale not applied');
+        assert(this._desktop.actor.scale_x === 1 && this._desktop.pitch === 24, 'native compact layout not applied');
         assert(this._desktop.cards.get('clock')._widget.time.text.includes(':'), 'digital clock missing');
         for (const id of ids) assert(this._desktop.cards.get(id)?._widget.loaded, 'independent photo not loaded');
         const task = this._desktop.cards.get('task')._widget;
@@ -129,7 +129,8 @@ export default class TestPerch extends Perch {
         }
         await delay(200);
         assert(task.editor.entry.get_text() === 'Buy milk', 'task keyboard entry failed');
-        task.editor.dialog.close(); await delay(350);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.RELEASED); await delay(350);
         assert(this._store.state.tasks.some(t => t.text === 'Buy milk'), 'task not saved');
         await click(task.list.get_children()[0].get_children()[0]);
         assert(this._store.state.tasks[0].done, 'task checkbox click failed');
@@ -169,6 +170,79 @@ export default class TestPerch extends Perch {
         for (const actor of global.get_window_actors()) if (/amberol/i.test(actor.meta_window.get_title() ?? '')) actor.meta_window.delete(global.get_current_time());
     }
 
+    async _refinements(keyboard, pointer) {
+        const key = async symbol => {
+            keyboard.notify_keyval(GLib.get_monotonic_time(), symbol, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time(), symbol, Clutter.KeyState.RELEASED);
+            await delay(120);
+        };
+        const click = async actor => {
+            const [x,y] = actor.get_transformed_position(), [w,h] = actor.get_transformed_size();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), x+w/2, y+h/2); await delay(100);
+            pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.PRESSED); await delay(80);
+            pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.RELEASED); await delay(300);
+        };
+        let note = this._desktop.cards.get('note')._widget;
+        note.openEditor(); await delay(300); note.entry.set_text('清晰的中文备忘录'); note.entry.clutter_text.set_cursor_position(-1);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+        await key(Clutter.KEY_Return);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+        await key(Clutter.KEY_x);
+        assert(this._store.state.note.includes('\n'), 'Ctrl+Enter failed to insert newline');
+        await key(Clutter.KEY_Return); await delay(300);
+        assert(!note.editor.dialog.visible, 'Return did not finish note');
+        assert(note.modified.text.match(/^\d{2}-\d{2}-\d{2}$/), 'modified date missing');
+        this._settings.set_boolean('note-popup', false); await delay(400);
+        note = this._desktop.cards.get('note')._widget;
+        await click(note.entry); await key(Clutter.KEY_z); await key(Clutter.KEY_Return);
+        assert(this._store.state.note.includes('z'), 'inline note typing failed');
+        this._settings.set_boolean('note-show-date', false); await delay(350);
+        assert(!this._desktop.cards.get('note')._widget.modified.visible, 'date switch failed');
+        this._settings.set_boolean('launcher-labels', false); await delay(350);
+        const launcher = this._desktop.cards.get('launcher')._widget;
+        assert(!launcher.grid.get_first_child().child.get_last_child().visible, 'launcher labels visible');
+        assert(this._desktop.cards.get('launcher').rect.h === 6, 'launcher card did not compact to app count');
+        const focus = this._desktop.cards.get('focus')._widget;
+        for (const [i,minutes] of [5,10,15,25,30,50].entries()) {
+            await click(focus.actor.get_children()[2].get_children()[i]);
+            assert(this._store.state.focus.duration === minutes*60, `preset ${minutes} failed`);
+        }
+        this._settings.set_boolean('focus-sound', true);
+        this._store.state.focus.deadline = Date.now()-1000; await delay(1500);
+        assert(this._store.state.focus.remaining === 0, 'sound completion failed');
+        this._settings.set_boolean('focus-sound', false); await click(focus.reset);
+        const fixture = mockPlayer();
+        try {
+            await delay(1800);
+            const music = this._desktop.cards.get('music')._widget;
+            assert(music.lyric.visible && music.lyric.text.includes('第二句'), 'right-side lyric missing');
+            assert(music.lyric.x > music.actor.get_first_child().x, 'lyric not on right');
+            await screenshot('native-music-lyrics');
+            fixture.noLyrics(); await delay(500);
+            assert(!music.lyric.visible && music.lyric.text === '', 'empty lyrics not hidden');
+        } finally { fixture.destroy(); }
+        const task = this._desktop.cards.get('task')._widget;
+        await click(task.addButton); task.editor.entry.set_text('未完成任务'); await key(Clutter.KEY_Return); await delay(300);
+        assert(task.list.get_first_child().get_first_child().child.text.includes('未完成任务'), 'completed task not sorted last');
+        this._desktop.setEditing(true); await delay(300); await screenshot('native-edit-outline');
+        const frame = this._desktop.cards.get('photo-bbbbbbbb');
+        await click(frame._remove); await delay(400);
+        assert(!this._desktop.cards.has('photo-bbbbbbbb'), 'photo delete failed');
+        assert(Gio.File.new_for_path(`${output}/photos/photo2.png`).query_exists(null), 'photo delete removed original');
+        this._desktop.setEditing(false); await delay(600);
+        this._settings.set_string('theme','light'); await delay(400);
+        await screenshot('native-widgets'); await assertCardPaint(this._desktop, 'native-widgets');
+        this._indicator.menu.open(); await delay(400); await screenshot('native-topbar-menu'); this._indicator.menu.close();
+        await click(this._desktop.cards.get('system')._widget.actor); await delay(1600);
+        assert(global.get_window_actors().some(a => /System Monitor|系统监视器/.test(a.meta_window.get_title() ?? '')), 'system monitor did not open');
+        for (const a of global.get_window_actors()) if (/System Monitor|系统监视器/.test(a.meta_window.get_title() ?? '')) a.meta_window.delete(global.get_current_time());
+        for (const zoom of [0.5,1,1.25,0.75]) {
+            this._settings.set_double('widget-scale', zoom); await delay(350);
+            assert(this._desktop.actor.scale_x === 1, 'text actor resampled');
+        }
+        await this._store.flush();
+    }
+
     async _run() {
         if (GLib.getenv('PERCH_FEATURES_ONLY')) {
             await delay(5500); Main.overview.hide(); Main.welcomeDialog?.close();
@@ -176,7 +250,9 @@ export default class TestPerch extends Perch {
             this._settings.set_string('photo-source', `${output}/photos`);
             await delay(500);
             const seat = global.stage.context.get_backend().get_default_seat();
-            return this._newFeatures(seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE), seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE));
+            const keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE), pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+            await this._newFeatures(keyboard, pointer);
+            return this._refinements(keyboard, pointer);
         }
         if (GLib.getenv('PERCH_PAINT_ONLY')) return this._paintStress();
         await delay(5500);
@@ -340,7 +416,7 @@ export default class TestPerch extends Perch {
             await delay(250);
             assert(!music.toggle.reactive && !music.next.reactive, 'MPRIS capability flags ignored');
             await delay(1200);
-            assert(music.art.content !== null && music.actor.get_style().includes('gradient'), 'album cover or palette missing');
+            assert(music.art.content !== null && music.actor.get_parent().get_style().includes('gradient'), 'album cover or palette missing');
             assert(music.lyric.text === '测试歌词第二句', `lyrics not synced: ${music.lyric.text}`);
             await screenshot('music-fixture');
             fixture.localLyrics(); await delay(1600);

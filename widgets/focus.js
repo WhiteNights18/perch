@@ -19,6 +19,13 @@ export function createFocus(settings, store) {
     dial.add_child(ring);
     dial.add_child(time);
     actor.add_child(dial);
+    const presets = new St.Widget({layout_manager: new Clutter.GridLayout(), x_align: Clutter.ActorAlign.CENTER});
+    [5, 10, 15, 25, 30, 50].forEach((minutes, i) => {
+        const choose = new St.Button({label: `${minutes}m`, can_focus: true, style_class: 'perch-focus-preset'});
+        choose.connect('clicked', () => { if (!store.writable) return; settings.set_int('focus-minutes', minutes); save(newFocus('work', minutes)); });
+        presets.layout_manager.attach(choose, i % 3, Math.floor(i / 3), 1, 1);
+    });
+    actor.add_child(presets);
     const controls = new St.BoxLayout({style_class: 'perch-focus-controls', x_align: Clutter.ActorAlign.CENTER});
     const reset = button('view-refresh-symbolic', '重置本轮计时', () => {
         save(newFocus(store.state.focus.phase, settings.get_int(store.state.focus.phase === 'work' ? 'focus-minutes' : 'break-minutes')));
@@ -65,6 +72,7 @@ export function createFocus(settings, store) {
             state.deadline = 0;
             state.remaining = 0;
             store.changed();
+            if (settings.get_boolean('focus-sound')) global.display.get_sound_player().play_from_theme('complete', '栖格计时完成', null);
             Main.notify('栖格 · 番茄钟', state.phase === 'work' ? '这一轮专注完成，休息一下吧。' : '休息结束，可以开始下一轮专注。');
         }
         caption.text = !store.writable ? '计时数据只读' : !remaining ? (state.phase === 'work' ? '专注完成 · 开始休息' : '休息完成 · 继续专注') : state.phase === 'work' ? '专注片刻' : '休息一下';

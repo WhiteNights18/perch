@@ -45,6 +45,10 @@ export default class PerchPreferences extends ExtensionPreferences {
         addSwitch(widgets, 'show-clock', '时钟与日期');
         addSwitch(widgets, 'show-seconds', '显示秒针');
         addSwitch(widgets, 'show-note', '随手记');
+        addSwitch(widgets, 'note-popup', '在弹窗中编辑备忘录', '关闭后直接在组件内编辑；回车完成，Ctrl+回车换行');
+        addSwitch(widgets, 'note-show-date', '显示备忘录最后修改日期');
+        addSwitch(widgets, 'launcher-labels', '显示应用名称');
+        addSwitch(widgets, 'launcher-auto-size', '按应用数量调整启动器尺寸', '手动调整尺寸后自动关闭');
         addSwitch(widgets, 'show-photo', '照片与轮播');
         addSwitch(widgets, 'show-system', '系统状态');
         for (const [key, title] of [['calendar', '月历'], ['focus', '番茄钟'], ['music', '音乐控制'], ['weather', '天气'], ['task', '任务清单'], ['launcher', '应用启动器']])
@@ -54,6 +58,7 @@ export default class PerchPreferences extends ExtensionPreferences {
         widgets.add(interval);
         const focus = new Adw.PreferencesGroup({title: '番茄钟', description: '时长将在下一次重置或切换阶段时使用。隐藏组件会继续计时，重新显示时检查完成状态。'});
         page.add(focus);
+        addSwitch(focus, 'focus-sound', '计时结束时播放提示音');
         for (const [key, title, upper] of [['focus-minutes', '专注时长（分钟）', 120], ['break-minutes', '休息时长（分钟）', 60]]) {
             const row = new Adw.SpinRow({title, adjustment: new Gtk.Adjustment({lower: 1, upper, step_increment: 1})});
             settings.bind(key, row, 'value', Gio.SettingsBindFlags.DEFAULT);

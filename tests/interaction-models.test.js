@@ -16,7 +16,7 @@ test('multiple frames retain independent sources, pause and collision-free layou
  assert.equal(overlaps(...Object.values(placed)),false);
 });
 test('invalid task state is protected and old notes migrate',()=>{
- const s=defaultState(); delete s.tasks;assert.deepEqual(decodeState(JSON.stringify(s)).tasks,[]);
+ const s=defaultState(); s.noteModified=1791900000000; assert.equal(decodeState(JSON.stringify(s)).noteModified,s.noteModified); delete s.noteModified; assert.equal(decodeState(JSON.stringify(s)).noteModified,0); delete s.tasks;assert.deepEqual(decodeState(JSON.stringify(s)).tasks,[]);
  s.tasks=[{id:'x',text:'x',done:'yes'}];assert.throws(()=>decodeState(JSON.stringify(s)));
 });
 test('LRC timestamps, multiple tags and offset follow playback and seek',()=>{

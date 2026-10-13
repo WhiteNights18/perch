@@ -28,6 +28,6 @@ export function mockPlayer() {
     const object = Gio.DBusExportedObject.wrapJSObject(XML, player);
     object.export(Gio.DBus.session, '/org/mpris/MediaPlayer2');
     const owner = Gio.bus_own_name_on_connection(Gio.DBus.session, 'org.mpris.MediaPlayer2.PerchTest', Gio.BusNameOwnerFlags.NONE, null, null);
-    return {player, localLyrics() { player.Metadata['xesam:asText'] = new GLib.Variant('s', ''); player.Metadata['xesam:url'] = new GLib.Variant('s', Gio.File.new_for_path(song).get_uri()); object.emit_property_changed('Metadata', new GLib.Variant('a{sv}', player.Metadata)); }, lock() { player.CanControl = false; object.emit_property_changed('CanControl', new GLib.Variant('b', false)); },
+    return {player, noLyrics() { delete player.Metadata['xesam:asText']; delete player.Metadata['xesam:url']; object.emit_property_changed('Metadata', new GLib.Variant('a{sv}', player.Metadata)); }, localLyrics() { player.Metadata['xesam:asText'] = new GLib.Variant('s', ''); player.Metadata['xesam:url'] = new GLib.Variant('s', Gio.File.new_for_path(song).get_uri()); object.emit_property_changed('Metadata', new GLib.Variant('a{sv}', player.Metadata)); }, lock() { player.CanControl = false; object.emit_property_changed('CanControl', new GLib.Variant('b', false)); },
         destroy() { Gio.bus_unown_name(owner); object.unexport(); }};
 }

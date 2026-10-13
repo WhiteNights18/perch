@@ -5,7 +5,6 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 import PangoCairo from 'gi://PangoCairo';
 import Cairo from 'cairo';
-import {MAX_NOTE_LENGTH} from '../lib/layout.js';
 import {SystemSampler} from '../lib/system.js';
 
 import {createCalendar} from './calendar.js';
@@ -14,7 +13,8 @@ import {createMusic} from './music.js';
 import {createWeather} from './weather.js';
 import {createTask} from './task.js';
 import {createLauncher} from './launcher.js';
-import {textEditor} from '../lib/editor.js';
+import {createNote} from './note.js';
+import {launchApp} from '../lib/apps.js';
 import {createPhoto} from './photo.js';
 import {WIDGET_NAMES} from '../lib/sizes.js';
 
@@ -111,29 +111,7 @@ export function createWidget(type, settings, store) {
         const id = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, update);
         return {actor, date, time, destroy() { GLib.Source.remove(id); }};
     }
-    if (type === 'note') {
-        const summary = text => text.split('\n').slice(0, 12).join('\n').slice(0, 700);
-        const preview = label(summary(store.state.note) || '点击记录一点想法…', 'perch-note-preview');
-        preview.x_expand = preview.y_expand = true;
-        preview.y_align = Clutter.ActorAlign.START;
-        preview.clutter_text.set_line_wrap(true);
-        preview.clutter_text.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR);
-        const editor = textEditor('备忘录 · 自动保存', store.state.note, MAX_NOTE_LENGTH, text => {
-            if (!store.writable) return;
-            store.state.note = text;
-            preview.text = summary(text) || '点击记录一点想法…';
-            store.changed();
-        });
-        editor.entry.clutter_text.set_editable(store.writable);
-        const heading = new St.BoxLayout({style_class: 'perch-note-heading'});
-        heading.add_child(new St.Icon({icon_name: 'document-edit-symbolic', icon_size: 18}));
-        heading.add_child(label('备忘录', 'perch-note-heading-text'));
-        actor.add_child(heading);
-        const open = new St.Button({child: preview, can_focus: true, x_expand: true, y_expand: true, style_class: 'perch-note-paper', clip_to_allocation: true, accessible_name: '编辑备忘录'});
-        open.connect('clicked', () => editor.open());
-        actor.add_child(open);
-        return {actor, entry: editor.entry, openButton: open, openEditor: () => editor.open(), editor, destroy() { editor.destroy(); }};
-    }
+    if (type === 'note') return createNote(settings, store);
 
     const gauges = new St.BoxLayout({style_class: 'perch-gauges', x_expand: true, y_expand: true});
     const cpu = gauge('处理器', 'perch-cpu');
@@ -156,7 +134,9 @@ export function createWidget(type, settings, store) {
         ram.update(sample.memory.percent);
         detail.text = `${sample.memory.usedGiB.toFixed(1)} / ${sample.memory.totalGiB.toFixed(1)} GiB`;
     });
-    return {actor, destroy() { sampler.destroy(); }};
+    const open = new St.Button({child: actor, can_focus: true, x_expand: true, y_expand: true, accessible_name: '打开系统监视器'});
+    open.connect('clicked', () => launchApp('org.gnome.SystemMonitor.desktop'));
+    return {actor: open, destroy() { sampler.destroy(); }};
 }
 
 function gauge(title, style) {
