@@ -19,6 +19,7 @@ test_extension="$XDG_DATA_HOME/gnome-shell/extensions/perch@perilla.local"
 mkdir -p "$test_extension"
 unzip -q dist/perch@perilla.local.shell-extension.zip -d "$test_extension"
 mv "$test_extension/extension.js" "$test_extension/perch.js"
+cp tests/mpris-fixture.js "$test_extension/mpris-fixture.js"
 cp tests/shell-harness.js "$test_extension/extension.js"
 glib-compile-schemas "$test_extension/schemas"
 gsettings set org.gnome.shell enabled-extensions "['perch@perilla.local']"
@@ -33,7 +34,7 @@ dbus-run-session -- bash -c '
     gnome-shell --headless --wayland --no-x11 --virtual-monitor=1440x1000 &
     shell_pid=$!
     trap "kill $shell_pid 2>/dev/null || true" EXIT
-    for ((i=0; i<45; i++)); do
+    for ((i=0; i<90; i++)); do
         if [[ -f "$PERCH_TEST_OUTPUT/result.txt" ]]; then
             cat "$PERCH_TEST_OUTPUT/result.txt"
             exit 0

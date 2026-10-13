@@ -10,7 +10,7 @@
 .perch-clock-face { min-height: 70px; }
 .perch-clock-date { font-size: 9pt; font-weight: 500; }
 .perch-note { padding: 0; spacing: 0; }
-.perch-note-heading { background-gradient-direction: vertical; background-gradient-start: #f7d965; background-gradient-end: #edc548; color: #5b4716; border-radius: 23px 23px 0 0; padding: 13px 16px; spacing: 8px; }
+.perch-note-heading { background-color: #f2cf50; color: #5b4716; border-radius: 23px 23px 0 0; padding: 13px 16px; spacing: 8px; }
 .perch-note-heading-text { font-size: 11pt; font-weight: 700; }
 .perch-note-paper { padding: 14px 16px; }
 .perch-note-entry { padding: 0; border: none; border-radius: 0; box-shadow: none; background-color: transparent; color: inherit; font-size: 11pt; }
@@ -36,3 +36,44 @@
 .perch-edit-mode { background-color: rgba(18,22,30,0.13); border-radius: 14px; }
 .perch-card.perch-editing { border-color: #83b6f6; }
 .perch-card.perch-dragging { border-color: #c1dcff; box-shadow: 0 6px 18px 0 rgba(0,0,0,0.24); }
+/* Shared, keyboard-accessible controls for the new interactive widgets. */
+.perch-action { border-radius: 18px; padding: 8px; color: inherit; }
+.perch-action:hover { background-color: rgba(128,128,128,0.16); }
+.perch-action:focus, .perch-calendar-today:focus, .perch-music-source:focus { box-shadow: inset 0 0 0 2px #83b6f6; }
+.perch-widget-heading { font-size: 13pt; font-weight: 600; }
+.perch-calendar { padding: 12px 14px; spacing: 4px; }
+.perch-calendar-heading { spacing: 2px; }
+.perch-calendar-month { font-size: 10pt; font-weight: 600; color: #f06a62; padding-top: 4px; }
+.perch-light .perch-calendar-month { color: #cb413c; }
+.perch-calendar-nav { padding: 4px; }
+.perch-calendar-today { font-size: 17pt; font-weight: 600; text-align: left; padding: 0 0 5px; border-radius: 6px; }
+.perch-calendar-weekday { font-size: 8pt; color: #969a9e; }
+.perch-calendar-day { font-family: "Noto Sans"; font-size: 9pt; min-width: 20px; text-align: center; border-radius: 14px; padding: 2px; }
+.perch-calendar-selected { color: #ffffff; background-color: #e55a50; }
+.perch-focus { padding: 12px 16px; spacing: 5px; }
+.perch-focus-heading { font-size: 10pt; font-weight: 600; color: #eb9676; }
+.perch-light .perch-focus-heading { color: #a84c2d; }
+.perch-focus-time { font-family: "Noto Sans"; font-size: 23pt; font-weight: 500; }
+.perch-focus-controls { spacing: 16px; }
+.perch-focus-start { background-color: #ed794c; color: #ffffff; min-width: 46px; }
+.perch-desktop.perch-dark .perch-card-focus { background-color: #302a27; }
+.perch-desktop.perch-light .perch-card-focus { background-color: #fff4e9; }
+.perch-music { padding: 20px; spacing: 10px; }
+.perch-desktop .perch-card.perch-card-music { box-shadow: none; background-color: #674653; background-gradient-direction: vertical; background-gradient-start: #674653; background-gradient-end: #282732; color: #fff6f7; }
+.perch-music-top { spacing: 18px; }
+.perch-music-art { background-gradient-direction: vertical; background-gradient-start: #d393a0; background-gradient-end: #8e6278; border-radius: 18px; padding: 20px; color: #fff1ed; }
+.perch-music-text { spacing: 5px; }
+.perch-music-eyebrow { font-size: 9pt; color: #e8b7c4; }
+.perch-music-title { font-size: 16pt; font-weight: 600; }
+.perch-music-artist { font-size: 10pt; color: #d2c3ca; }
+.perch-music-controls { spacing: 20px; }
+.perch-music-play { background-color: rgba(255,255,255,0.16); min-width: 42px; }
+.perch-music-source { font-size: 8pt; color: #d4c7d0; border-radius: 8px; padding: 2px; }
+.perch-weather { padding: 14px 16px; spacing: 6px; color: #ffffff; }
+.perch-desktop .perch-card.perch-card-weather { box-shadow: none; background-color: #285d91; background-gradient-direction: vertical; background-gradient-start: #285d91; background-gradient-end: #4a99b7; }
+.perch-weather-heading { spacing: 4px; }
+.perch-weather-refresh { padding: 4px; color: #d3edff; }
+.perch-temperature { font-family: "Noto Sans"; font-size: 44pt; font-weight: 300; }
+.perch-weather-condition { font-size: 12pt; font-weight: 500; }
+.perch-weather-range { font-size: 10pt; color: #eef8ff; }
+.perch-weather-source { font-size: 7pt; color: #d8edfa; }

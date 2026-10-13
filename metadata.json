@@ -1,9 +1,9 @@
 {
   "uuid": "perch@perilla.local",
   "name": "栖格 Perch",
-  "description": "GNOME 51 桌面组件：日期时钟、便签和系统监控。支持网格编辑和本地布局保存。",
+  "description": "GNOME 51 桌面组件：时钟、便签、系统监控、月历、番茄钟、音乐与天气。支持网格编辑和本地布局保存。",
   "shell-version": ["51"],
-  "version": 3,
-  "version-name": "0.1.0-alpha.3",
+  "version": 4,
+  "version-name": "0.2.0-alpha.1",
   "settings-schema": "org.gnome.shell.extensions.perch"
 }

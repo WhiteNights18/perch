@@ -8,8 +8,13 @@ import Cairo from 'cairo';
 import {MAX_NOTE_LENGTH} from '../lib/layout.js';
 import {SystemSampler} from '../lib/system.js';
 
-export const TITLES = {clock: '时钟与日期', note: '随手记', system: '系统状态'};
-export const ICONS = {clock: 'preferences-system-time-symbolic', note: 'document-edit-symbolic', system: 'system-run-symbolic'};
+import {createCalendar} from './calendar.js';
+import {createFocus} from './focus.js';
+import {createMusic} from './music.js';
+import {createWeather} from './weather.js';
+
+export const TITLES = {clock: '时钟与日期', note: '随手记', system: '系统状态', calendar: '月历', focus: '番茄钟', music: '音乐', weather: '天气'};
+export const ICONS = {clock: 'preferences-system-time-symbolic', note: 'document-edit-symbolic', system: 'system-run-symbolic', calendar: 'x-office-calendar-symbolic', focus: 'alarm-symbolic', music: 'audio-x-generic-symbolic', weather: 'weather-clear-symbolic'};
 
 function column(style = '') {
     return new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: style, x_expand: true, y_expand: true, clip_to_allocation: true});
@@ -20,6 +25,10 @@ function label(text, style) {
 }
 
 export function createWidget(type, settings, store) {
+    if (type === 'calendar') return createCalendar();
+    if (type === 'focus') return createFocus(settings, store);
+    if (type === 'music') return createMusic();
+    if (type === 'weather') return createWeather(settings);
     const actor = column(`perch-content perch-${type}`);
     if (type === 'clock') {
         const face = new St.DrawingArea({x_expand: true, y_expand: true, style_class: 'perch-clock-face'});

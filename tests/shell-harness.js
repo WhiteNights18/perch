@@ -5,6 +5,7 @@ import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import Perch from './perch.js';
+import {mockPlayer} from './mpris-fixture.js';
 
 const delay = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
     resolve();
@@ -40,6 +41,10 @@ async function screenshot(name) {
 
 export default class TestPerch extends Perch {
     enable() {
+        if (!this._started) {
+            const settings = this.getSettings();
+            for (const type of ['calendar', 'focus', 'music', 'weather']) settings.set_boolean(`show-${type}`, false);
+        }
         super.enable();
         if (!this._started) {
             this._started = true;
@@ -165,6 +170,81 @@ export default class TestPerch extends Perch {
         await this._store.flush();
         await delay(3500);
         await screenshot('after-reenable');
+        for (const type of ['calendar', 'focus', 'music', 'weather']) this._settings.set_boolean(`show-${type}`, true);
+        await delay(1000);
+        assert(this._desktop.cards.size === 7, 'new widgets not all visible');
+        const click = async button => {
+            button.grab_key_focus();
+            keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_space, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_space, Clutter.KeyState.RELEASED);
+            await delay(200);
+        };
+        const calendar = this._desktop.cards.get('calendar')._widget;
+        const monthTitle = calendar.title.text;
+        await click(calendar.next);
+        assert(calendar.title.text !== monthTitle, 'calendar next month failed');
+        await click(calendar.today);
+        assert(calendar.title.text === monthTitle, 'calendar today failed');
+        const focus = this._desktop.cards.get('focus')._widget;
+        await click(focus.toggle);
+        assert(this._store.state.focus.deadline > Date.now(), 'focus did not start');
+        await delay(1200);
+        await click(focus.toggle);
+        assert(this._store.state.focus.deadline === 0 && this._store.state.focus.remaining < 1500, 'focus pause failed');
+        await click(focus.toggle);
+        const deadline = this._store.state.focus.deadline;
+        this._settings.set_string('theme', 'dark');
+        await delay(1000);
+        assert(this._store.state.focus.deadline === deadline, 'theme rebuild reset timer');
+        const fixture = mockPlayer();
+        try {
+            await delay(800);
+            const music = this._desktop.cards.get('music')._widget;
+            assert(music.title.text.includes('测试曲目'), 'MPRIS metadata did not arrive');
+            await click(music.toggle);
+            assert(fixture.player.PlaybackStatus === 'Playing', 'MPRIS playback control failed');
+            await click(music.next);
+            await click(music.previous);
+            assert(fixture.player.next === 1 && fixture.player.previous === 1, 'MPRIS track controls failed');
+            fixture.lock();
+            await delay(250);
+            assert(!music.toggle.reactive && !music.next.reactive, 'MPRIS capability flags ignored');
+            await screenshot('music-fixture');
+        } finally { fixture.destroy(); }
+        await delay(400);
+        assert(this._desktop.cards.get('music')._widget.service.state === null, 'closed player retained');
+        // Completion survives a rebuild and transitions only when explicitly started.
+        this._store.state.focus.deadline = Date.now() - 1000;
+        await delay(1500);
+        assert(this._store.state.focus.remaining === 0, 'focus completion failed');
+        await click(this._desktop.cards.get('focus')._widget.toggle);
+        assert(this._store.state.focus.phase === 'break', 'focus break transition failed');
+        await click(this._desktop.cards.get('focus')._widget.reset);
+        this._store.state.focus = {phase: 'work', duration: 1500, remaining: 1500, deadline: 0};
+        this._store.changed();
+        await delay(1500);
+        await delay(4000);
+        await screenshot('all-widgets-dark');
+        this._settings.set_string('theme', 'light');
+        await delay(3500);
+        await screenshot('all-widgets-light');
+        fonts.push(...checkFonts([
+            this._desktop.cards.get('calendar')._widget.title.clutter_text,
+            this._desktop.cards.get('music')._widget.title.clutter_text,
+            this._desktop.cards.get('focus')._widget.actor.get_first_child().clutter_text,
+        ]));
+        GLib.file_set_contents(`${output}/fonts.txt`, fonts.join('\n'));
+        await click(this._desktop.cards.get('focus')._widget.toggle);
+        const savedDeadline = this._store.state.focus.deadline;
+        await this._store.flush();
+        super.disable();
+        super.enable();
+        await delay(800);
+        assert(this._desktop.cards.size === 7, 'new widgets reenable failed');
+        assert(this._store.state.focus.deadline === savedDeadline && savedDeadline > Date.now(), 'running focus timer lost on reload');
+        await click(this._desktop.cards.get('focus')._widget.reset);
+        assert(this._store.state.note.includes('课程笔记'), 'upgrade lost note');
+        console.log(`[Perch test] weather live state: ${this._desktop.cards.get('weather')._widget.temperature.text}`);
         this.openPreferences();
         await delay(2000);
         assert(global.get_window_actors().some(actor => /Perch|栖格/.test(actor.meta_window.get_title() ?? '')), 'preferences window did not open');

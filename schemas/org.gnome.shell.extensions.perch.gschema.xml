@@ -9,5 +9,12 @@
     <key name="show-note" type="b"><default>true</default><summary>显示便签</summary></key>
     <key name="show-system" type="b"><default>true</default><summary>显示系统监控</summary></key>
     <key name="reset-layout" type="u"><default>0</default><summary>重置布局请求序号，不删除便签</summary></key>
+    <key name="show-calendar" type="b"><default>true</default><summary>显示月历</summary></key>
+    <key name="show-focus" type="b"><default>true</default><summary>显示番茄钟</summary></key>
+    <key name="show-music" type="b"><default>true</default><summary>显示音乐</summary></key>
+    <key name="show-weather" type="b"><default>true</default><summary>显示天气</summary></key>
+    <key name="focus-minutes" type="i"><default>25</default><range min="1" max="120"/><summary>专注分钟数</summary></key>
+    <key name="break-minutes" type="i"><default>5</default><range min="1" max="60"/><summary>休息分钟数</summary></key>
+    <key name="weather-location" type="(sdd)"><default>('苏州', 31.30408, 120.59538)</default><summary>天气城市名称、纬度和经度</summary></key>
   </schema>
 </schemalist>
