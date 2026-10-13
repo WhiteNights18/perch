@@ -6,6 +6,8 @@ import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import Perch from './perch.js';
 import {mockPlayer} from './mpris-fixture.js';
+import {SIZE_PRESETS} from './lib/sizes.js';
+import {loadPhoto} from './lib/photos.js';
 
 const delay = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
     resolve();
@@ -39,6 +41,29 @@ async function screenshot(name) {
     stream.close(null);
 }
 
+// Check the captured title pixels as well as actor geometry; thumbnail previews
+// alone are not reliable evidence that text was actually painted.
+async function assertCardPaint(desktop, name) {
+    const pixbuf = await loadPhoto(`${output}/${name}.png`, new Gio.Cancellable());
+    const pixels = pixbuf.read_pixel_bytes().get_data();
+    const scale = pixbuf.width / global.stage.width;
+    for (const type of ['note', 'weather', 'music']) {
+        const widget = desktop.cards.get(type)._widget;
+        const content = type === 'note' ? widget.actor.get_children()[0].get_children()[1] : type === 'music' ? widget.title : widget.temperature;
+        const [ax, ay] = content.get_transformed_position();
+        const cx = ax * scale, cy = ay * scale;
+        let ink = 0;
+        for (let y = Math.ceil(cy); y < Math.floor(cy + content.height * scale); y++) {
+            for (let x = Math.ceil(cx); x < Math.floor(cx + content.width * scale); x++) {
+                const i = y * pixbuf.rowstride + x * pixbuf.n_channels;
+                const [r, g, b] = pixels.subarray(i, i + 3);
+                if (type === 'note' ? r < 150 && g < 130 && b < 80 : r > 220 && g > 200 && b > 200) ink++;
+            }
+        }
+        assert(ink > 20, `${name}: ${type} has geometry but missing painted title (${ink})`);
+    }
+}
+
 export default class TestPerch extends Perch {
     enable() {
         if (!this._started) {
@@ -57,7 +82,23 @@ export default class TestPerch extends Perch {
         GLib.file_set_contents(`${output}/result.txt`, text);
     }
 
+    async _paintStress() {
+        await delay(5500);
+        Main.overview.hide();
+        Main.welcomeDialog?.close();
+        for (const type of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${type}`, true);
+        this._settings.set_string('photo-source', `${output}/photos`);
+        for (let i = 0; i < 6; i++) {
+            this._settings.set_string('theme', i % 2 ? 'dark' : 'light');
+            this._settings.set_boolean('photo-paused', Boolean(i % 2));
+            await delay(800);
+            await screenshot(`paint-${i}`);
+            await assertCardPaint(this._desktop, `paint-${i}`);
+        }
+    }
+
     async _run() {
+        if (GLib.getenv('PERCH_PAINT_ONLY')) return this._paintStress();
         await delay(5500);
         Main.overview.hide();
         Main.welcomeDialog?.close();
@@ -245,9 +286,132 @@ export default class TestPerch extends Perch {
         await click(this._desktop.cards.get('focus')._widget.reset);
         assert(this._store.state.note.includes('课程笔记'), 'upgrade lost note');
         console.log(`[Perch test] weather live state: ${this._desktop.cards.get('weather')._widget.temperature.text}`);
+        // Photo tests use generated landscapes and a corrupt fixture, never user files.
+        const photos = `${output}/photos`;
+        const waitFor = async (predicate, message) => {
+            for (let i = 0; i < 60; i++) { if (predicate()) return; await delay(100); }
+            throw new Error(message);
+        };
+        const photo = () => this._desktop.cards.get('photo')._widget;
+        this._settings.set_string('photo-source', photos);
+        this._settings.set_boolean('photo-paused', true);
+        this._settings.set_boolean('show-photo', true);
+        await delay(300);
+        await waitFor(() => photo().loaded, 'folder photo did not decode');
+        assert(this._desktop.cards.size === 8, 'photo card missing');
+        const firstPhoto = photo().current;
+        await click(photo().next);
+        await waitFor(() => photo().current !== firstPhoto, 'manual next photo failed');
+        this._settings.set_int('photo-interval', 5);
+        this._settings.set_boolean('photo-paused', false);
+        await delay(400);
+        await waitFor(() => photo().loaded, 'photo reload failed');
+        const beforeAuto = photo().current;
+        await delay(6200);
+        assert(photo().current !== beforeAuto, 'automatic slideshow failed');
+        await click(photo().pause);
+        await waitFor(() => photo().loaded, 'pause rebuild failed');
+        const pausedPhoto = photo().current;
+        await delay(6200);
+        assert(photo().current === pausedPhoto, 'paused slideshow advanced');
+        this._settings.set_string('photo-source', `${photos}/photo1.png`);
+        await delay(300);
+        await waitFor(() => photo().loaded, 'single photo failed');
+        this._settings.set_string('photo-source', `${photos}/broken`);
+        await delay(300);
+        await waitFor(() => photo().message.text.includes('无法读取'), 'corrupt photo not reported');
+        assert(!photo().loaded, 'corrupt photo retained previous image');
+        this._settings.set_string('photo-source', `${photos}/empty`);
+        await delay(300);
+        await waitFor(() => photo().message.text.includes('没有可用'), 'empty folder not reported');
+        const watchedFile = Gio.File.new_for_path(`${photos}/empty/added.png`);
+        Gio.File.new_for_path(`${photos}/photo1.png`).copy(watchedFile, Gio.FileCopyFlags.NONE, null, null);
+        await waitFor(() => photo().loaded, 'directory monitor missed added photo');
+        watchedFile.delete(null);
+        await waitFor(() => !photo().loaded, 'directory monitor retained deleted photo');
+        this._settings.set_string('photo-source', photos);
+        await delay(300);
+        await waitFor(() => photo().loaded, 'folder restore failed');
+        const requestSize = (type, w, h) => {
+            const serial = this._settings.get_value('size-request').deep_unpack()[3];
+            this._settings.set_value('size-request', new GLib.Variant('(suuu)', [type, w * 4, h * 4, (serial + 1) >>> 0]));
+        };
+        // Exercise every supported preset with only its target enabled.
+        for (const [type, presets] of Object.entries(SIZE_PRESETS)) {
+            for (const id of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${id}`, id === type);
+            for (const [w, h] of presets) {
+                requestSize(type, w, h);
+                await delay(250);
+                const rect = this._desktop.cards.get(type)?.rect;
+                assert(rect?.w === w * 4 && rect?.h === h * 4, `preset failed: ${type} ${w}x${h}`);
+                if (type === 'photo') {
+                    await waitFor(() => photo().loaded, 'resized photo failed');
+                    await delay(150);
+                    await screenshot(`photo-${w}x${h}`);
+                }
+            }
+        }
+        this._settings.set_string('photo-fit', 'contain');
+        await delay(300);
+        await waitFor(() => photo().loaded, 'contain photo failed');
+        await screenshot('photo-contain');
+        this._settings.set_string('photo-fit', 'cover');
+        this._settings.set_uint('reset-layout', this._settings.get_uint('reset-layout') + 1);
+        for (const id of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${id}`, true);
+        await delay(3500);
+        await waitFor(() => photo().loaded, 'gallery photo failed');
+        await screenshot('photo-gallery-light');
+        await assertCardPaint(this._desktop, 'photo-gallery-light');
+        this._settings.set_string('theme', 'dark');
+        await delay(3500);
+        await waitFor(() => photo().loaded, 'dark photo failed');
+        await screenshot('photo-gallery-dark');
+        await assertCardPaint(this._desktop, 'photo-gallery-dark');
+        requestSize('photo', 2, 4);
+        await delay(500);
+        const savedPhoto = {...this._store.state.layout.photo};
+        await this._store.flush();
+        super.disable();
+        super.enable();
+        await delay(600);
+        await waitFor(() => photo().loaded, 'photo did not survive reenable');
+        assert(JSON.stringify(this._store.state.layout.photo) === JSON.stringify(savedPhoto), 'photo preset did not persist');
+        assert(this._store.state.note.includes('课程笔记'), 'size change erased note');
         this.openPreferences();
         await delay(2000);
         assert(global.get_window_actors().some(actor => /Perch|栖格/.test(actor.meta_window.get_title() ?? '')), 'preferences window did not open');
+        const assertBelowWindows = () => {
+            const siblings = global.window_group.get_children();
+            const desktopIndex = siblings.indexOf(this._desktop.actor);
+            for (const actor of global.get_window_actors()) {
+                if (actor.get_parent() === global.window_group && actor.visible)
+                    assert(siblings.indexOf(actor) > desktopIndex, 'desktop covers an application window');
+            }
+        };
+        assertBelowWindows();
         await screenshot('preferences');
+        // The test-only preferences wrapper opens the native image picker.
+        await delay(3000);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_l, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_l, Clutter.KeyState.RELEASED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+        await delay(300);
+        for (const char of `${photos}/photo2.png`) {
+            keyboard.notify_keyval(GLib.get_monotonic_time(), char.codePointAt(0), Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time(), char.codePointAt(0), Clutter.KeyState.RELEASED);
+        }
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.PRESSED);
+        keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.RELEASED);
+        await delay(1000);
+        if (this._settings.get_string('photo-source') !== `${photos}/photo2.png`) {
+            keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time(), Clutter.KEY_Return, Clutter.KeyState.RELEASED);
+        }
+        await waitFor(() => this._settings.get_string('photo-source') === `${photos}/photo2.png`, 'native file chooser did not apply selection');
+        await waitFor(() => photo().loaded && photo().current === `${photos}/photo2.png`, 'chosen file did not render');
+        await delay(1200);
+        assertBelowWindows();
+        await screenshot('photo-preferences');
     }
 }

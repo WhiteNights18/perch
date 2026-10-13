@@ -1,0 +1,31 @@
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import GdkPixbuf from 'gi://GdkPixbuf';
+import {photoFiles, loadPhoto, renderPhoto} from '../lib/photos.js';
+const directory = GLib.dir_make_tmp('perch-photo-test-XXXXXX');
+const file = name => Gio.File.new_for_path(`${directory}/${name}`);
+const original = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, true, 8, 80, 40);
+original.fill(0x4499bbff);
+for (const name of ['photo10.png', 'photo2.png', '.hidden.png']) original.savev(file(name).get_path(), 'png', [], []);
+file('bad.png').replace_contents('not an image', null, false, Gio.FileCreateFlags.PRIVATE, null);
+file('other.txt').replace_contents('not an image', null, false, Gio.FileCreateFlags.PRIVATE, null);
+const cancel = new Gio.Cancellable();
+const result = await photoFiles(directory, cancel);
+if (result.files.length !== 3 || !result.files[1].endsWith('photo2.png')) throw new Error('filter/order failed');
+const loaded = await loadPhoto(file('photo2.png').get_path(), cancel);
+const rendered = renderPhoto(loaded, 240, 480, 'cover', 23);
+if (rendered.width !== 240 || rendered.height !== 480) throw new Error('portrait render failed');
+const bytes = rendered.bytes.get_data();
+if (bytes[3] !== 0 || bytes[240 * 4 * 240 + 120 * 4 + 3] !== 255) throw new Error('rounded alpha mask failed');
+const contained = renderPhoto(loaded, 240, 480, 'contain', 23).bytes.get_data();
+if (contained[100 * 4] !== 0x15) throw new Error('contain letterbox failed');
+let failed = false;
+try { await loadPhoto(file('bad.png').get_path(), cancel); } catch (_) { failed = true; }
+if (!failed) throw new Error('corrupt image should fail');
+cancel.cancel();
+failed = false;
+try { await photoFiles(directory, cancel); } catch (_) { failed = true; }
+if (!failed) throw new Error('cancellation ignored');
+for (const name of ['photo10.png', 'photo2.png', '.hidden.png', 'bad.png', 'other.txt']) file(name).delete(null);
+Gio.File.new_for_path(directory).delete(null);
+print('PASS: real image decode, natural ordering, corrupt data, cancellation, cover/contain and rounded corners');

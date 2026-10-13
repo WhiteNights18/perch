@@ -14,6 +14,8 @@
 .perch-note-heading-text { font-size: 11pt; font-weight: 700; }
 .perch-note-paper { padding: 14px 16px; }
 .perch-note-entry { padding: 0; border: none; border-radius: 0; box-shadow: none; background-color: transparent; color: inherit; font-size: 11pt; }
+.perch-light .perch-note-entry .hint-text { color: #747674; }
+.perch-dark .perch-note-entry .hint-text { color: #a4a5a5; }
 .perch-note-entry:focus { border: none; box-shadow: none; background-color: transparent; }
 .perch-note-status { padding: 0 16px 10px; }
 .perch-system { padding: 14px 20px; spacing: 8px; }
@@ -77,3 +79,23 @@
 .perch-weather-condition { font-size: 12pt; font-weight: 500; }
 .perch-weather-range { font-size: 10pt; color: #eef8ff; }
 .perch-weather-source { font-size: 7pt; color: #d8edfa; }
+.perch-size-label { color: #c5d6e9; font-size: 8pt; padding: 1px 3px; }
+.perch-large .perch-clock-date { font-size: 12pt; }
+.perch-large .perch-focus-time { font-size: 34pt; }
+.perch-large .perch-focus-heading { font-size: 12pt; }
+.perch-large .perch-ring { width: 104px; height: 104px; }
+.perch-large .perch-gauge-value { font-size: 26pt; }
+.perch-large .perch-calendar-day { font-size: 13pt; min-width: 28px; padding: 3px; border-radius: 18px; }
+.perch-large .perch-calendar-today { font-size: 25pt; }
+.perch-large .perch-calendar-month { font-size: 12pt; }
+.perch-large .perch-note-entry { font-size: 13pt; }
+.perch-large .perch-temperature { font-size: 60pt; }
+.perch-tall .perch-note-paper { padding: 20px 16px; }
+.perch-desktop .perch-card.perch-card-photo { background-color: #202730; border-color: transparent; }
+.perch-photo-empty { padding: 16px; spacing: 16px; color: #bccbd8; }
+.perch-photo-message { font-size: 10pt; }
+.perch-photo-choose { border-radius: 18px; background-color: #3b4d61; color: #ffffff; padding: 8px 12px; font-size: 10pt; }
+.perch-photo-choose:focus { box-shadow: inset 0 0 0 2px #83b6f6; }
+.perch-photo-controls { background-color: rgba(20,27,36,0.78); color: white; border-radius: 20px; spacing: 1px; margin: 12px; padding: 2px 6px; }
+.perch-photo-controls .perch-action { padding: 6px; }
+.perch-photo-count { font-family: "Noto Sans"; font-size: 9pt; padding: 7px 4px; }

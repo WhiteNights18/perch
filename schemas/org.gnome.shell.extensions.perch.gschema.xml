@@ -16,5 +16,11 @@
     <key name="focus-minutes" type="i"><default>25</default><range min="1" max="120"/><summary>专注分钟数</summary></key>
     <key name="break-minutes" type="i"><default>5</default><range min="1" max="60"/><summary>休息分钟数</summary></key>
     <key name="weather-location" type="(sdd)"><default>('苏州', 31.30408, 120.59538)</default><summary>天气城市名称、纬度和经度</summary></key>
+    <key name="show-photo" type="b"><default>false</default><summary>显示照片组件</summary></key>
+    <key name="photo-source" type="s"><default>''</default><summary>本地图片或文件夹路径</summary></key>
+    <key name="photo-interval" type="i"><default>30</default><range min="5" max="3600"/><summary>轮播间隔秒数</summary></key>
+    <key name="photo-fit" type="s"><default>'cover'</default><choices><choice value="cover"/><choice value="contain"/></choices><summary>照片填充方式</summary></key>
+    <key name="photo-paused" type="b"><default>false</default><summary>暂停图片轮播</summary></key>
+    <key name="size-request" type="(suuu)"><default>('', 0, 0, 0)</default><summary>组件尺寸调整请求</summary></key>
   </schema>
 </schemalist>

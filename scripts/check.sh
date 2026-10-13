@@ -7,4 +7,5 @@ done < <(find . -path './.git' -prune -o -name '*.js' -print0)
 glib-compile-schemas --strict --dry-run schemas
 node --test tests/*.test.js
 gjs -m tests/store.gjs.js
+gjs -m tests/photos.gjs.js
 git diff --check

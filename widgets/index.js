@@ -12,9 +12,11 @@ import {createCalendar} from './calendar.js';
 import {createFocus} from './focus.js';
 import {createMusic} from './music.js';
 import {createWeather} from './weather.js';
+import {createPhoto} from './photo.js';
+import {WIDGET_NAMES} from '../lib/sizes.js';
 
-export const TITLES = {clock: '时钟与日期', note: '随手记', system: '系统状态', calendar: '月历', focus: '番茄钟', music: '音乐', weather: '天气'};
-export const ICONS = {clock: 'preferences-system-time-symbolic', note: 'document-edit-symbolic', system: 'system-run-symbolic', calendar: 'x-office-calendar-symbolic', focus: 'alarm-symbolic', music: 'audio-x-generic-symbolic', weather: 'weather-clear-symbolic'};
+export const TITLES = WIDGET_NAMES;
+export const ICONS = {clock: 'preferences-system-time-symbolic', note: 'document-edit-symbolic', system: 'system-run-symbolic', calendar: 'x-office-calendar-symbolic', focus: 'alarm-symbolic', music: 'audio-x-generic-symbolic', weather: 'weather-clear-symbolic', photo: 'image-x-generic-symbolic'};
 
 function column(style = '') {
     return new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: style, x_expand: true, y_expand: true, clip_to_allocation: true});
@@ -25,6 +27,7 @@ function label(text, style) {
 }
 
 export function createWidget(type, settings, store) {
+    if (type === 'photo') return createPhoto(settings);
     if (type === 'calendar') return createCalendar();
     if (type === 'focus') return createFocus(settings, store);
     if (type === 'music') return createMusic();
@@ -133,7 +136,7 @@ export function createWidget(type, settings, store) {
         });
         return {actor, entry, destroy() {}};
     }
-    const gauges = new St.BoxLayout({style_class: 'perch-gauges', x_expand: true});
+    const gauges = new St.BoxLayout({style_class: 'perch-gauges', x_expand: true, y_expand: true});
     const cpu = gauge('处理器', 'perch-cpu');
     const ram = gauge('内存', 'perch-memory');
     const detail = label('正在读取…', 'perch-caption');
@@ -159,7 +162,8 @@ export function createWidget(type, settings, store) {
 
 function gauge(title, style) {
     const actor = column(`perch-gauge ${style}`);
-    actor.y_expand = false;
+    actor.y_expand = true;
+    actor.y_align = Clutter.ActorAlign.CENTER;
     const dial = new St.Widget({layout_manager: new Clutter.BinLayout(), x_align: Clutter.ActorAlign.CENTER});
     const ring = new St.DrawingArea({style_class: 'perch-ring'});
     const value = new St.Label({text: '—', style_class: 'perch-gauge-value', x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
