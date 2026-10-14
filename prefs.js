@@ -24,8 +24,19 @@ export default class PerchPreferences extends ExtensionPreferences {
         window.set_default_size(620, 700);
         const page = new Adw.PreferencesPage({title: '栖格', icon_name: 'view-grid-symbolic'});
         window.add(page);
-        addPhotoAndSizePage(window, settings);
-        addApplicationsPage(window, settings);
+        const componentPage = new Adw.PreferencesPage({name: 'components', title: '组件', icon_name: 'preferences-desktop-apps-symbolic'});
+        window.add(componentPage);
+        const componentGroup = new Adw.PreferencesGroup({title: '桌面组件', description: '打开组件后展开其设置；关闭不会删除内容。'});
+        componentPage.add(componentGroup);
+        const components = {};
+        for (const [type, title] of Object.entries(WIDGET_NAMES)) {
+            const row = new Adw.ExpanderRow({title, show_enable_switch: true});
+            settings.bind(`show-${type}`, row, 'enable-expansion', Gio.SettingsBindFlags.DEFAULT);
+            componentGroup.add(row);
+            components[type] = {addIndependent(child) { componentGroup.add(child); }, add(child) { row.add_row(child); settings.bind(`show-${type}`, child, 'sensitive', Gio.SettingsBindFlags.GET); }, remove(child) { row.remove(child); }};
+        }
+        addPhotoAndSizePage(window, settings, components);
+        addApplicationsPage(window, settings, components);
         const appearance = new Adw.PreferencesGroup({title: '你的桌面，一目了然', description: '栖格 Perch · 轻盈、清晰的桌面组件'});
         page.add(appearance);
         const themes = ['system', 'light', 'dark'];
@@ -40,32 +51,22 @@ export default class PerchPreferences extends ExtensionPreferences {
             group.add(row);
         };
         addSwitch(appearance, 'translucent', '通透卡片', '让壁纸颜色轻轻透入卡片');
-        const widgets = new Adw.PreferencesGroup({title: '桌面组件', description: '关闭组件会保留便签内容和布局。'});
-        page.add(widgets);
-        addSwitch(widgets, 'show-clock', '时钟与日期');
-        addSwitch(widgets, 'show-seconds', '显示秒针');
-        addSwitch(widgets, 'show-note', '随手记');
-        addSwitch(widgets, 'note-popup', '在弹窗中编辑备忘录', '关闭后直接在组件内编辑；回车完成，Ctrl+回车换行');
-        addSwitch(widgets, 'note-show-date', '显示备忘录最后修改日期');
-        addSwitch(widgets, 'launcher-labels', '显示应用名称');
-        addSwitch(widgets, 'launcher-auto-size', '按应用数量调整启动器尺寸', '手动调整尺寸后自动关闭');
-        addSwitch(widgets, 'show-photo', '照片与轮播');
-        addSwitch(widgets, 'show-system', '系统状态');
-        for (const [key, title] of [['calendar', '月历'], ['focus', '番茄钟'], ['music', '音乐控制'], ['weather', '天气'], ['task', '任务清单'], ['launcher', '应用启动器']])
-            addSwitch(widgets, `show-${key}`, title);
+        addSwitch(components.clock, 'show-seconds', '显示秒针');
+        addSwitch(components.note, 'note-popup', '在弹窗中编辑', '关闭后直接在组件内编辑');
+        addSwitch(components.note, 'note-show-date', '显示最后修改日期');
+        addSwitch(components.launcher, 'launcher-labels', '显示应用名称');
+        addSwitch(components.launcher, 'launcher-auto-size', '按应用数量调整尺寸', '手动调整尺寸后自动关闭');
         const interval = new Adw.SpinRow({title: '系统监控刷新间隔', subtitle: '单位：秒', adjustment: new Gtk.Adjustment({lower: 2, upper: 30, step_increment: 1, page_increment: 5})});
         settings.bind('sample-seconds', interval, 'value', Gio.SettingsBindFlags.DEFAULT);
-        widgets.add(interval);
-        const focus = new Adw.PreferencesGroup({title: '番茄钟', description: '时长将在下一次重置或切换阶段时使用。隐藏组件会继续计时，重新显示时检查完成状态。'});
-        page.add(focus);
+        components.system.add(interval);
+        const focus = components.focus;
         addSwitch(focus, 'focus-sound', '计时结束时播放提示音');
         for (const [key, title, upper] of [['focus-minutes', '专注时长（分钟）', 120], ['break-minutes', '休息时长（分钟）', 60]]) {
             const row = new Adw.SpinRow({title, adjustment: new Gtk.Adjustment({lower: 1, upper, step_increment: 1})});
             settings.bind(key, row, 'value', Gio.SettingsBindFlags.DEFAULT);
             focus.add(row);
         }
-        const weather = new Adw.PreferencesGroup({title: '天气城市', description: '每 15 分钟更新。仅向 Open-Meteo 发送所选城市坐标；搜索时发送城市名称。数据由天气模型提供。'});
-        page.add(weather);
+        const weather = components.weather;
         const selected = new Adw.ActionRow({title: '当前城市', subtitle: settings.get_value('weather-location').deep_unpack()[0]});
         weather.add(selected);
         const query = new Adw.EntryRow({title: '输入城市名称'});
@@ -120,11 +121,8 @@ export default class PerchPreferences extends ExtensionPreferences {
     }
 }
 
-function addPhotoAndSizePage(window, settings) {
-    const page = new Adw.PreferencesPage({name: 'photos', title: '照片与尺寸', icon_name: 'image-x-generic-symbolic'});
-    window.add(page);
-    const photos = new Adw.PreferencesGroup({title: '桌面相框', description: '选择本地图片，或轮播文件夹内的图片。不上传文件，不读取子文件夹。'});
-    page.add(photos);
+function addPhotoAndSizePage(window, settings, components) {
+    const photos = components.photo;
     const pathRow = new Adw.ActionRow({title: '图片来源', subtitle: settings.get_string('photo-source') || '尚未选择'});
     photos.add(pathRow);
     const cancel = new Gio.Cancellable();
@@ -167,11 +165,9 @@ function addPhotoAndSizePage(window, settings) {
     const paused = new Adw.SwitchRow({title: '暂停自动轮播'});
     settings.bind('photo-paused', paused, 'active', Gio.SettingsBindFlags.DEFAULT);
     photos.add(paused);
-    addExtraPhotos(page, window, settings);
-    const sizes = new Adw.PreferencesGroup({title: '组件尺寸', description: '宽 × 高。2 × 2 为小方卡，3 × 3 为大方卡，2 × 4 为竖版。选择规格即调整；空间不足时保留原尺寸。也可在桌面编辑模式拖动右下角自由缩放。'});
-    page.add(sizes);
+    addExtraPhotos(photos, window, settings);
     for (const [type, presets] of Object.entries(SIZE_PRESETS)) {
-        const row = new Adw.ComboRow({title: WIDGET_NAMES[type], model: Gtk.StringList.new(['选择尺寸…', ...presets.map(([w, h]) => `${w} × ${h}`)])});
+        const row = new Adw.ComboRow({title: '组件尺寸', model: Gtk.StringList.new(['选择尺寸…', ...presets.map(([w, h]) => `${w} × ${h}`)])});
         row.connect('notify::selected', () => {
             if (row.selected === 0) return;
             const [w, h] = presets[row.selected - 1];
@@ -180,19 +176,18 @@ function addPhotoAndSizePage(window, settings) {
             row.selected = 0;
             window.add_toast(new Adw.Toast({title: `已请求将${WIDGET_NAMES[type]}调整为 ${w} × ${h}`}));
         });
-        sizes.add(row);
+        components[type].add(row);
     }
 }
 
-function addApplicationsPage(window, settings) {
-    const page = new Adw.PreferencesPage({title: '应用', icon_name: 'view-app-grid-symbolic'}); window.add(page);
+function addApplicationsPage(window, settings, components) {
     const apps = Gio.AppInfo.get_all().filter(a => a.should_show() && a.get_id()).sort((a, b) => a.get_display_name().localeCompare(b.get_display_name(), 'zh-CN'));
     const ids = ['', ...apps.map(a => a.get_id())];
     const names = ['未选择', ...apps.map(a => a.get_display_name())];
-    const music = new Adw.PreferencesGroup({title: '音乐播放器', description: '点击封面或空闲时的播放按钮打开所选播放器。读取播放器提供的封面与歌词；也支持歌曲旁同名 .lrc 文件。'}); page.add(music);
+    const music = components.music;
     const player = new Adw.ComboRow({title: '默认播放器', model: Gtk.StringList.new(names), selected: Math.max(0, ids.indexOf(settings.get_string('music-player')))});
     player.connect('notify::selected', () => settings.set_string('music-player', ids[player.selected])); music.add(player);
-    const group = new Adw.PreferencesGroup({title: '应用启动器', description: '最多九个快捷入口，点击即可打开或切换到应用。'}); page.add(group);
+    const group = components.launcher;
     const selection = settings.get_strv('launcher-apps').slice(0, 9);
     for (let i = 0; i < 9; i++) {
         const row = new Adw.ComboRow({title: `应用 ${i + 1}`, model: Gtk.StringList.new(names), selected: Math.max(0, ids.indexOf(selection[i] || ''))});
@@ -200,8 +195,10 @@ function addApplicationsPage(window, settings) {
     }
 }
 
-function addExtraPhotos(page, window, settings) {
-    const group = new Adw.PreferencesGroup({title: '独立相框', description: '最多新增八个相框，每个分别保存来源、大小、位置和轮播状态。'}); page.add(group);
+function addExtraPhotos(photos, window, settings) {
+    const section = new Adw.ExpanderRow({title: '独立相框', subtitle: '最多新增八个，每个独立设置；移除相框保留原图'});
+    photos.addIndependent(section);
+    const group = {add(row) { section.add_row(row); }, remove(row) { section.remove(row); }};
     const rows = [];
     const write = (id, changes) => settings.set_string('photo-instances', JSON.stringify(photoInstances(settings).map(p => p.id === id ? {...p, ...changes} : p)));
     const cancel = new Gio.Cancellable(); window.connect('close-request', () => { cancel.cancel(); return false; });

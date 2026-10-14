@@ -18,6 +18,7 @@ export function createNote(settings, store) {
     const updateDate = () => { modified.text = store.state.noteModified ? GLib.DateTime.new_from_unix_local(Math.floor(store.state.noteModified / 1000)).format('%y-%m-%d') : ''; };
     updateDate();
     const preview = label(store.state.note || '点击记录一点想法…', 'perch-note-preview');
+    preview.clutter_text.set_line_alignment(Pango.Alignment.LEFT);
     preview.clutter_text.set_line_wrap(true); preview.clutter_text.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR);
     preview.clutter_text.set_ellipsize(Pango.EllipsizeMode.NONE);
     const save = text => {
@@ -25,7 +26,7 @@ export function createNote(settings, store) {
         store.state.note = text; store.state.noteModified = Date.now();
         preview.text = text || '点击记录一点想法…'; updateDate(); store.changed();
     };
-    const editor = textEditor('备忘录 · 回车完成 / Ctrl+回车换行', store.state.note, MAX_NOTE_LENGTH, save);
+    const editor = textEditor('备忘录', store.state.note, MAX_NOTE_LENGTH, save);
     editor.entry.clutter_text.set_editable(store.writable);
     const scroll = new St.ScrollView({x_expand: true, y_expand: true, style_class: 'perch-note-scroll'});
     scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
@@ -33,7 +34,7 @@ export function createNote(settings, store) {
     scroll.set_child(body); actor.add_child(scroll);
     let entry = editor.entry, open = null;
     if (settings.get_boolean('note-popup')) {
-        open = new St.Button({child: preview, x_expand: true, can_focus: true, accessible_name: '编辑备忘录'});
+        open = new St.Button({child: preview, x_expand: true, x_align: Clutter.ActorAlign.START, y_align: Clutter.ActorAlign.START, can_focus: true, accessible_name: '编辑备忘录'});
         preview.x_align = Clutter.ActorAlign.START;
         open.connect('clicked', () => editor.open()); body.add_child(open);
     } else {

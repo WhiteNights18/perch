@@ -56,7 +56,7 @@
 .perch-focus-heading { font-size: 10pt; font-weight: 600; color: #eb9676; }
 .perch-light .perch-focus-heading { color: #a84c2d; }
 .perch-focus-time { font-family: "Noto Sans"; font-size: 23pt; font-weight: 500; }
-.perch-focus-controls { spacing: 16px; }
+.perch-focus-controls { spacing: 12px; }
 .perch-focus-start { background-color: #ed794c; color: #ffffff; min-width: 46px; }
 .perch-desktop.perch-dark .perch-card-focus { background-color: #302a27; }
 .perch-desktop.perch-light .perch-card-focus { background-color: #fff4e9; }
@@ -128,7 +128,7 @@
 .perch-music-lyric { max-width: 180px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.16); }
 .perch-music-title { font-size: 13pt; }
 .perch-calendar-today:hover { background-color: rgba(128,128,128,0.12); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-.perch-note-modified { font-size: 8pt; color: #796223; }
+.perch-note-modified { font-size: 10pt; color: #796223; }
 .perch-note-scroll { padding: 12px; }
 .perch-focus-preset { padding: 3px 10px; border-radius: 8px; font-size: 9pt; }
 .perch-focus-preset:hover, .perch-focus-preset:focus { background-color: rgba(237,121,76,0.2); }

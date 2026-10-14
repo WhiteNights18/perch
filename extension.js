@@ -17,7 +17,8 @@ export default class Perch extends Extension {
         this._settings = this.getSettings();
         this._interface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._indicator = new PanelMenu.Button(0.5, '栖格 Perch');
-        this._indicator.add_child(new St.Icon({icon_name: 'view-grid-symbolic', style_class: 'system-status-icon'}));
+        this._indicator.set_style('padding: 0; min-width: 0; -minimum-hpadding: 4px; -natural-hpadding: 4px;');
+        this._indicator.add_child(new St.Icon({icon_name: 'view-grid-symbolic', icon_size: 16, style: 'padding: 0; margin: 0;', style_class: 'system-status-icon'}));
         this._indicator.menu.addMenuItem(new PopupMenu.PopupMenuItem('栖格 · Perch', {reactive: false}));
         this._edit = new PopupMenu.PopupSwitchMenuItem('编辑桌面布局', false);
         this._edit.setSensitive(false);

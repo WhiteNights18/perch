@@ -204,9 +204,13 @@ export default class TestPerch extends Perch {
         assert(this._desktop.cards.get('launcher').rect.h === 6, 'launcher card did not compact to app count');
         const focus = this._desktop.cards.get('focus')._widget;
         for (const [i,minutes] of [5,10,15,25,30,50].entries()) {
-            await click(focus.actor.get_children()[2].get_children()[i]);
+            await click(focus.choose); await delay(200);
+            await click(focus.menu._getMenuItems()[i]);
             assert(this._store.state.focus.duration === minutes*60, `preset ${minutes} failed`);
         }
+        const diameter = Math.min(focus.dial.width, focus.dial.height) - 10;
+        assert(focus.time.width < diameter && focus.time.height < diameter, 'timer text exceeds ring');
+        await click(focus.choose); await delay(300); await screenshot('focus-time-menu'); focus.menu.close();
         this._settings.set_boolean('focus-sound', true);
         this._store.state.focus.deadline = Date.now()-1000; await delay(1500);
         assert(this._store.state.focus.remaining === 0, 'sound completion failed');
@@ -240,10 +244,39 @@ export default class TestPerch extends Perch {
             this._settings.set_double('widget-scale', zoom); await delay(350);
             assert(this._desktop.actor.scale_x === 1, 'text actor resampled');
         }
+        const savedApps = this._settings.get_strv('launcher-apps');
+        for (const count of [1,2,3,4,5,6,7,8,9]) {
+            this._settings.set_strv('launcher-apps', Array.from({length: count}, (_, i) => savedApps[i % savedApps.length]));
+            await delay(300);
+            const card = this._desktop.cards.get('launcher');
+            const grid = card._widget.grid;
+            const rows = new Map();
+            for (const item of grid.get_children()) {
+                assert(item.x >= 0 && item.y >= 0 && item.x + item.width <= grid.width + 1 && item.y + item.height <= grid.height + 1, `launcher ${count} clipped`);
+                const row = rows.get(item.y) ?? []; row.push(item); rows.set(item.y,row);
+            }
+            for (const row of rows.values()) assert(Math.abs(row[0].x - (grid.width - row.at(-1).x - row.at(-1).width)) <= 1, `launcher ${count} asymmetric`);
+            await screenshot(`launcher-${count}`);
+        }
+        this._settings.set_strv('launcher-apps', savedApps); await delay(350);
+        assert(this._indicator.width <= 28, `panel button too wide: ${this._indicator.width}`);
         await this._store.flush();
     }
 
     async _run() {
+        if (GLib.getenv('PERCH_PREFS_ONLY')) {
+            await delay(5500); Main.overview.hide(); Main.welcomeDialog?.close();
+            this.openPreferences(); await delay(3000);
+            const [ok, bytes] = GLib.file_get_contents(`${output}/prefs-check.txt`);
+            assert(ok && new TextDecoder().decode(bytes) === 'PASS', 'preferences hierarchy failed');
+            await screenshot('grouped-preferences'); return;
+        }
+        if (GLib.getenv('PERCH_PANEL_ONLY')) {
+            await delay(5500); Main.overview.hide(); Main.welcomeDialog?.close(); await delay(500);
+            const b = this._indicator, c = b.get_first_child();
+            console.log(`[Perch panel] width=${b.width}, preferred=${b.get_preferred_width(-1)}, child=${c.width}, childPref=${c.get_preferred_width(-1)}, padding=${b._minHPadding}/${b._natHPadding}, style=${b.get_style()}, container=${b.container.width}`);
+            return;
+        }
         if (GLib.getenv('PERCH_FEATURES_ONLY')) {
             await delay(5500); Main.overview.hide(); Main.welcomeDialog?.close();
             for (const type of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${type}`, true);
