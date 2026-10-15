@@ -10,6 +10,7 @@ import {MediaPlayers} from '../lib/mpris.js';
 import {launchApp} from '../lib/apps.js';
 import {loadPhoto, renderPhoto} from '../lib/photos.js';
 import {readText} from '../lib/io.js';
+import {coverPalette} from '../lib/workflows.js';
 import {parseLyrics, lyricAt} from '../lib/lyrics.js';
 import {column, label, button, sensitive} from './ui.js';
 
@@ -36,6 +37,28 @@ export function createMusic(settings) {
     const appName = GioUnix.DesktopAppInfo.new(playerId)?.get_display_name() ?? '播放器';
     const launch = () => launchApp(playerId);
     artButton.connect('clicked', launch);
+    let palette = [[103, 70, 83], [40, 39, 50]], paletteTimer = 0;
+    function paintPalette(next) {
+        if (paletteTimer) GLib.Source.remove(paletteTimer);
+        const from = palette.map(c => [...c]), started = GLib.get_monotonic_time();
+        paletteTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+            const t = Math.min(1, (GLib.get_monotonic_time() - started) / 320000);
+            const progress = t * t * (3 - 2 * t);
+            palette = from.map((color, i) => color.map((c, j) => Math.round(c + (next[i][j] - c) * progress)));
+            const rgb = c => `rgb(${c.join(',')})`;
+            actor.get_parent()?.set_style(`background-gradient-direction: vertical; background-gradient-start: ${rgb(palette[0])}; background-gradient-end: ${rgb(palette[1])}; color: #ffffff;`);
+            if (t === 1) { paletteTimer = 0; return GLib.SOURCE_REMOVE; }
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+    let availableWidth = 0;
+    function layoutLyrics() {
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const width = availableWidth || actor.width;
+        // Reserve about one third for lyrics; allow more lines on narrow cards.
+        lyric.set_style(`max-width: ${Math.max(60, Math.round(width * 0.34 / scale))}px; color: #ffffff;`);
+    }
+    lyric.connect('notify::visible', layoutLyrics);
     let closed = false, mediaKey = '', coverKey = '', lines = [], cancel = new Gio.Cancellable();
     async function media(state) {
         const key = `${state?.url ?? ''}\n${state?.lyrics ?? ''}`;
@@ -46,7 +69,8 @@ export function createMusic(settings) {
         lines = parseLyrics(state?.lyrics ?? '');
         lyric.text = lines[0]?.text || state?.lyrics?.split('\n').find(s => s.trim()) || '';
         lyric.visible = Boolean(lyric.text);
-        fallback.visible = true; art.content = null; actor.get_parent()?.set_style('');
+        fallback.visible = true; art.content = null;
+        if (!cover.startsWith('file://')) paintPalette([[103, 70, 83], [40, 39, 50]]);
         if (cover.startsWith('file://')) {
             try {
                 const file = Gio.File.new_for_uri(cover);
@@ -57,8 +81,7 @@ export function createMusic(settings) {
                 content.set_bytes(global.stage.context.get_backend().get_cogl_context(), rendered.bytes, Cogl.PixelFormat.RGBA_8888, 72, 72, rendered.stride);
                 art.content = content; fallback.visible = false;
                 const average = pixbuf.scale_simple(1, 1, GdkPixbuf.InterpType.BILINEAR).read_pixel_bytes().get_data();
-                const color = factor => `rgb(${Array.from(average.slice(0, 3), c => Math.round(c * factor + 14)).join(',')})`;
-                actor.get_parent()?.set_style(`background-gradient-direction: vertical; background-gradient-start: ${color(0.42)}; background-gradient-end: ${color(0.16)};`);
+                paintPalette(coverPalette(Array.from(average.slice(0, 3))));
             } catch (_) { /* Keep the neutral cover and palette. */ }
         }
         if (!state?.lyrics && state?.url?.startsWith('file://')) {
@@ -90,5 +113,5 @@ export function createMusic(settings) {
     });
     title.text = `打开 ${appName}`; artist.text = '点击封面或播放按钮'; source.label = `打开 ${appName}`;
     sensitive(previous, false); sensitive(next, false);
-    return {actor, title, artist, lyric, art, artButton, toggle, next, previous, service, destroy() { closed = true; cancel.cancel(); GLib.Source.remove(timer); service.destroy(); }};
+    return {actor, title, artist, lyric, art, artButton, toggle, next, previous, service, get palette() { return palette; }, resize(width) { availableWidth = width; layoutLyrics(); }, destroy() { closed = true; if (paletteTimer) GLib.Source.remove(paletteTimer); cancel.cancel(); GLib.Source.remove(timer); service.destroy(); }};
 }

@@ -60,7 +60,9 @@ export default class PerchPreferences extends ExtensionPreferences {
         settings.bind('sample-seconds', interval, 'value', Gio.SettingsBindFlags.DEFAULT);
         components.system.add(interval);
         const focus = components.focus;
-        addSwitch(focus, 'focus-sound', '计时结束时播放提示音');
+        const reminder = new Adw.ComboRow({title: '结束提醒', model: Gtk.StringList.new(['仅通知', '通知和提示音']), selected: settings.get_boolean('focus-sound') ? 1 : 0});
+        reminder.connect('notify::selected', () => settings.set_boolean('focus-sound', reminder.selected === 1));
+        focus.add(reminder);
         for (const [key, title, upper] of [['focus-minutes', '专注时长（分钟）', 120], ['break-minutes', '休息时长（分钟）', 60]]) {
             const row = new Adw.SpinRow({title, adjustment: new Gtk.Adjustment({lower: 1, upper, step_increment: 1})});
             settings.bind(key, row, 'value', Gio.SettingsBindFlags.DEFAULT);

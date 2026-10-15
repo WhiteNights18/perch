@@ -7,6 +7,7 @@ import GioUnix from 'gi://GioUnix';
 import Clutter from 'gi://Clutter';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {column, label, button} from './ui.js';
+import {reorder} from '../lib/workflows.js';
 import {launchApp} from '../lib/apps.js';
 // Allocate children directly; changing actor sizes inside allocation signals
 // causes stale hitboxes and non-centred rows on subsequent frames.
@@ -26,6 +27,8 @@ export function createLauncher(settings) {
     const apps = settings.get_strv('launcher-apps').slice(0, 9);
     const showLabels = settings.get_boolean('launcher-labels');
     const icons = [];
+    let dragging = false, editing = false;
+    const gestures = [];
     const items = apps.map(id => {
         const info = GioUnix.DesktopAppInfo.new(id);
         const item = new St.Button({can_focus: true, style_class: 'perch-launcher-app', accessible_name: info?.get_display_name() ?? id});
@@ -34,7 +37,22 @@ export function createLauncher(settings) {
         body.add_child(icon); icons.push(icon);
         const text = label(info?.get_display_name() ?? '未安装', 'perch-launcher-name'); text.x_align = Clutter.ActorAlign.CENTER; text.visible = showLabels;
         body.add_child(text); item.child = body;
-        item.connect('clicked', () => launchApp(id)); grid.add_child(item);
+        item.connect('clicked', () => { if (!dragging) launchApp(id); }); grid.add_child(item);
+        const gesture = new Clutter.PanGesture({required_button: 1});
+        gesture.connect('may-recognize', () => !editing && items.length > 1);
+        gesture.connect('recognize', () => { dragging = true; item.add_style_class_name('perch-app-dragging'); });
+        gesture.connect('pan-update', () => {
+            const delta = gesture.get_accumulated_delta_abs();
+            item.translation_x = Math.round(delta.get_x()); item.translation_y = Math.round(delta.get_y());
+        });
+        const clear = () => { item.translation_x = item.translation_y = 0; item.remove_style_class_name('perch-app-dragging'); dragging = false; };
+        gesture.connect('end', () => {
+            const x = item.x + item.width / 2 + item.translation_x, y = item.y + item.height / 2 + item.translation_y;
+            let target = items.findIndex(other => x >= other.x && x <= other.x + other.width && y >= other.y && y <= other.y + other.height);
+            const from = items.indexOf(item); clear();
+            if (target >= 0 && target !== from) settings.set_strv('launcher-apps', reorder(apps, from, target));
+        });
+        gesture.connect('cancel', clear); item.add_action(gesture); gestures.push(gesture);
         return item;
     });
     let widgetScale = settings.get_double('widget-scale');
@@ -67,5 +85,5 @@ export function createLauncher(settings) {
     layout.arrange = arrange;
     actor.add_child(grid);
     if (!apps.length) actor.add_child(label('在设置中添加常用应用', 'perch-caption'));
-    return {actor, grid, resize() { widgetScale = settings.get_double('widget-scale'); layout.layout_changed(); }, destroy() { if (iconIdle) GLib.Source.remove(iconIdle); layout.arrange = null; }};
+    return {actor, grid, setEditing(value) { editing = value; gestures.forEach(g => { g.enabled = !value; }); }, resize() { widgetScale = settings.get_double('widget-scale'); layout.layout_changed(); }, destroy() { if (iconIdle) GLib.Source.remove(iconIdle); layout.arrange = null; }};
 }

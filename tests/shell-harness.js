@@ -214,7 +214,7 @@ export default class TestPerch extends Perch {
         this._settings.set_boolean('focus-sound', true);
         this._store.state.focus.deadline = Date.now()-1000; await delay(1500);
         assert(this._store.state.focus.remaining === 0, 'sound completion failed');
-        this._settings.set_boolean('focus-sound', false); await click(focus.reset);
+        this._settings.set_boolean('focus-sound', false); await click(focus.reset); focus.restartMenu.close();
         const fixture = mockPlayer();
         try {
             await delay(1800);
@@ -263,7 +263,98 @@ export default class TestPerch extends Perch {
         await this._store.flush();
     }
 
+    async _workflows() {
+        await delay(5500); Main.overview.hide(); Main.welcomeDialog?.close();
+        for (const type of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${type}`, true);
+        this._settings.set_double('widget-scale', 0.75);
+        await delay(500);
+        const seat = global.stage.context.get_backend().get_default_seat();
+        const keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const key = async symbol => {
+            keyboard.notify_keyval(GLib.get_monotonic_time(),symbol,Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time(),symbol,Clutter.KeyState.RELEASED); await delay(150);
+        };
+        const click = async actor => {
+            const [x,y]=actor.get_transformed_position(), [w,h]=actor.get_transformed_size();
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(),x+w/2,y+h/2); await delay(100);
+            pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.PRESSED); await delay(80);
+            pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.RELEASED); await delay(300);
+        };
+        let note=this._desktop.cards.get('note')._widget;
+        note.openEditor(); await delay(200); note.entry.set_text('第一条笔记'); await delay(950);
+        note.entry.set_text('第一条笔记的新内容');
+        keyboard.notify_keyval(GLib.get_monotonic_time(),Clutter.KEY_Control_L,Clutter.KeyState.PRESSED); await key(Clutter.KEY_z);
+        keyboard.notify_keyval(GLib.get_monotonic_time(),Clutter.KEY_Control_L,Clutter.KeyState.RELEASED);
+        assert(note.current.text==='第一条笔记','note undo keyboard failed'); await key(Clutter.KEY_Return);
+        await click(note.addButton); note.entry.set_text('第二条笔记'); await key(Clutter.KEY_Return);
+        assert(this._store.state.notes.length===2,'independent note not created');
+        note.switchNote('main'); assert(note.entry.get_text()==='第一条笔记','note switching mixed content');
+        const long=Array.from({length:50},(_,i)=>`第 ${i+1} 行滚动测试`).join('\n');
+        note.openEditor(); await delay(200); note.entry.set_text(long); await key(Clutter.KEY_Return); await delay(300);
+        assert(note.scroll.vadjustment.upper > note.scroll.vadjustment.page_size,'long note cannot scroll');
+        note.scroll.vadjustment.value=100; await delay(200); assert(note.scroll.vadjustment.value>0,'note scrolling failed');
+        await screenshot('workflow-notes');
+        const task=this._desktop.cards.get('task')._widget;
+        await click(task.addButton); task.editor.entry.set_text('待办一'); await key(Clutter.KEY_Return);
+        await click(task.list.get_first_child().get_first_child());
+        assert(task.summary.label.includes('已完成 1 项') && !task.completed.visible,'done tasks not collapsed');
+        await click(task.summary); assert(task.completed.visible,'done task expand failed');
+        await click(task.completed.get_first_child().get_last_child());
+        assert(this._store.state.tasks.length===0 && task.undoButton.visible,'delete undo unavailable');
+        await click(task.undoButton); assert(this._store.state.tasks[0].text==='待办一','task restore failed');
+        const focus=this._desktop.cards.get('focus')._widget;
+        await click(focus.toggle); await delay(1200); await click(focus.toggle);
+        const remaining=this._store.state.focus.remaining;
+        assert(focus.toggle.accessible_name==='继续上一轮','resume label not explicit');
+        await click(focus.toggle); assert(this._store.state.focus.remaining<=remaining,'resume reset timer');
+        await click(focus.reset); await click(focus.restartMenu._getMenuItems()[0]);
+        assert(this._store.state.focus.deadline>Date.now() && this._store.state.focus.phase==='work','new round did not start');
+        await click(focus.toggle);
+        const before=this._settings.get_strv('launcher-apps');
+        let launcher=this._desktop.cards.get('launcher')._widget;
+        const first=launcher.grid.get_children()[0], last=launcher.grid.get_children()[2];
+        const [sx,sy]=first.get_transformed_position(),[tx,ty]=last.get_transformed_position();
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(),sx+first.width/2,sy+first.height/2); await delay(120);
+        pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.PRESSED); await delay(150);
+        for(let i=1;i<=12;i++){pointer.notify_absolute_motion(GLib.get_monotonic_time(),sx+first.width/2+(tx-sx)*i/12,sy+first.height/2+(ty-sy)*i/12);await delay(40);}
+        pointer.notify_button(GLib.get_monotonic_time(),1,Clutter.ButtonState.RELEASED); await delay(500);
+        assert(this._settings.get_strv('launcher-apps')[2]===before[0],'launcher drag reorder failed');
+        assert(!global.get_window_actors().some(a=>/Amberol/.test(a.meta_window.get_title()??'')),'drag launched app');
+        const requestSize=(w,h)=>this._settings.set_value('size-request',new GLib.Variant('(suuu)',['launcher',w,h,(this._settings.get_value('size-request').deep_unpack()[3]+1)>>>0]));
+        // Isolate the launcher so larger saved sizes cannot be blocked by neighbours.
+        for(const id of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${id}`,id==='launcher');
+        requestSize(12,8); await delay(300); this._settings.set_boolean('launcher-labels',false); await delay(300);
+        requestSize(8,6); await delay(300); this._settings.set_boolean('launcher-labels',true); await delay(300);
+        assert(this._desktop.cards.get('launcher').rect.w===12,'label size not restored');
+        this._settings.set_boolean('launcher-labels',false); await delay(300);
+        assert(this._desktop.cards.get('launcher').rect.h===6,'icon-only size not restored');
+        for(const id of Object.keys(SIZE_PRESETS)) this._settings.set_boolean(`show-${id}`,true);
+        await delay(600);
+        const fixture=mockPlayer(); await delay(1800);
+        const music=this._desktop.cards.get('music')._widget;
+        assert(music.palette[0].every(v=>v<=112),'music contrast bound failed');
+        const oldPalette=JSON.stringify(music.palette); fixture.cover(2);
+        for(let i=0;i<100 && JSON.stringify(music.palette)===oldPalette;i++) await delay(20);
+        const intermediate=JSON.stringify(music.palette); await delay(450);
+        assert(intermediate!==oldPalette && JSON.stringify(music.palette)!==intermediate,'palette did not animate through intermediate colors');
+        const small=music.lyric.get_style(); music.resize(700); const wide=music.lyric.get_style();
+        assert(small!==wide,'lyrics width not responsive'); music.resize(this._desktop.cards.get('music').actor.width);
+        await screenshot('workflow-widgets'); fixture.destroy();
+        const restoredTask=this._desktop.cards.get('task')._widget;
+        await click(restoredTask.completed.get_first_child().get_last_child());
+        await this._store.flush(); super.disable(); super.enable(); await delay(800);
+        assert(this._store.state.notes.length===2 && this._store.state.notes[1].text==='第二条笔记','notes lost on restart');
+        assert(this._store.state.deletedTasks.length===1,'delete undo lost on restart');
+        this._desktop.cards.get('task')._widget.undoDelete();
+        assert(this._store.state.tasks[0].text==='待办一','task restore not persisted');
+        this._desktop.cards.get('note')._widget.undo();
+        assert(this._desktop.cards.get('note')._widget.current.text==='第一条笔记','note undo lost on restart');
+        assert(this._store.state.launcherSizes.labels.w===12 && this._store.state.launcherSizes.icons.h===6,'launcher mode sizes lost');
+    }
+
     async _run() {
+        if (GLib.getenv('PERCH_WORKFLOWS_ONLY')) return this._workflows();
         if (GLib.getenv('PERCH_PREFS_ONLY')) {
             await delay(5500); Main.overview.hide(); Main.welcomeDialog?.close();
             this.openPreferences(); await delay(3000);
@@ -464,6 +555,7 @@ export default class TestPerch extends Perch {
         await click(this._desktop.cards.get('focus')._widget.toggle);
         assert(this._store.state.focus.phase === 'break', 'focus break transition failed');
         await click(this._desktop.cards.get('focus')._widget.reset);
+        this._desktop.cards.get('focus')._widget.restartMenu.close();
         this._store.state.focus = {phase: 'work', duration: 1500, remaining: 1500, deadline: 0};
         this._store.changed();
         await delay(1500);
@@ -487,6 +579,7 @@ export default class TestPerch extends Perch {
         assert(this._desktop.cards.size === 7, 'new widgets reenable failed');
         assert(this._store.state.focus.deadline === savedDeadline && savedDeadline > Date.now(), 'running focus timer lost on reload');
         await click(this._desktop.cards.get('focus')._widget.reset);
+        this._desktop.cards.get('focus')._widget.restartMenu.close();
         assert(this._store.state.note.includes('课程笔记'), 'upgrade lost note');
         console.log(`[Perch test] weather live state: ${this._desktop.cards.get('weather')._widget.temperature.text}`);
         // Photo tests use generated landscapes and a corrupt fixture, never user files.

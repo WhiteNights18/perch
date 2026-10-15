@@ -21,9 +21,17 @@ export function createFocus(settings, store) {
     dial.add_child(time);
     actor.add_child(dial);
     const controls = new St.BoxLayout({style_class: 'perch-focus-controls', x_align: Clutter.ActorAlign.CENTER});
-    const reset = button('view-refresh-symbolic', '重置本轮计时', () => {
-        save(newFocus(store.state.focus.phase, settings.get_int(store.state.focus.phase === 'work' ? 'focus-minutes' : 'break-minutes')));
+    const startNew = () => save(toggleFocus(newFocus('work', settings.get_int('focus-minutes'))));
+    const reset = button('view-refresh-symbolic', '开始新一轮', () => {
+        const decision = new PopupMenu.PopupMenuItem('开始新一轮');
+        restartMenu.removeAll(); restartMenu.addMenuItem(decision);
+        decision.connect('activate', startNew);
+        if (focusRemaining(store.state.focus) > 0 && !store.state.focus.deadline) restartMenu.addAction('继续上一轮', () => save(toggleFocus(store.state.focus)));
+        restartMenu.open();
     });
+    const restartMenu = new PopupMenu.PopupMenu(reset, 0.5, St.Side.TOP);
+    Main.uiGroup.add_child(restartMenu.actor); restartMenu.actor.hide();
+    const restartManager = new PopupMenu.PopupMenuManager(reset); restartManager.addMenu(restartMenu);
     const toggle = button('media-playback-start-symbolic', '开始专注', () => {
         if (!focusRemaining(store.state.focus)) {
             const phase = store.state.focus.phase === 'work' ? 'break' : 'work';
@@ -92,11 +100,14 @@ export function createFocus(settings, store) {
         caption.text = !store.writable ? '计时数据只读' : !remaining ? (state.phase === 'work' ? '专注完成 · 开始休息' : '休息完成 · 继续专注') : state.phase === 'work' ? '专注片刻' : '休息一下';
         time.text = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
         toggle.child.icon_name = state.deadline ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
-        toggle.accessible_name = state.deadline ? '暂停计时' : remaining ? '开始或继续计时' : '开始下一阶段';
+        const paused = !state.deadline && remaining > 0 && (state.started || remaining < state.duration);
+        toggle.accessible_name = state.deadline ? '暂停计时' : paused ? '继续上一轮' : remaining ? '开始专注' : state.phase === 'work' ? '开始休息' : '开始新一轮';
+        if (paused) caption.text = '已暂停 · 继续上一轮';
+        else if (state.deadline) caption.text = state.phase === 'work' ? '专注中 · 点击暂停' : '休息中 · 点击暂停';
         fitTime();
         ring.queue_repaint();
     }
     render();
     const timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => { render(); return GLib.SOURCE_CONTINUE; });
-    return {actor, toggle, reset, time, dial, choose, menu, setEditing(editing) { if (editing) menu.close(); }, destroy() { menu.destroy(); GLib.Source.remove(timer); }};
+    return {actor, toggle, reset, restartMenu, startNew, time, dial, choose, menu, setEditing(editing) { if (editing) { menu.close(); restartMenu.close(); } }, destroy() { menu.destroy(); restartMenu.destroy(); GLib.Source.remove(timer); }};
 }
